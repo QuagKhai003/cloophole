@@ -40,8 +40,10 @@ cloophole install
 ```
 
 That's it — `install` registers a hidden run-at-logon shim (user Startup folder)
-**and** starts the daemon right now. It's idempotent: re-run it any time to restart
-with the latest code. Remove everything with `cloophole uninstall`.
+**and** starts the daemon right now. The daemon serves a live status page at
+**http://127.0.0.1:8787** — run `cloophole open` to pop it in your browser. It's
+idempotent: re-run `install` any time to restart with the latest code. Remove
+everything with `cloophole uninstall`.
 
 Prefer a Task Scheduler task instead of the Startup shim? `cloophole install --task`
 (that one may prompt for an elevated terminal).
@@ -64,7 +66,8 @@ cloophole fire-now                     # fire immediately, ignoring the gate
 cloophole arm    "in 2h"               # arm manually (clock / relative / ISO)
 cloophole clear                        # back to WATCHING
 cloophole config [key [value]]         # show / get / set tunables
-cloophole ui [port]                    # local status page (default :8787)
+cloophole open                         # open the status page in your browser
+cloophole ui [port]                    # serve the page in the foreground
 cloophole start | stop                 # start/stop the background daemon
 cloophole uninstall                    # remove shim/task + stop the daemon
 ```
@@ -83,6 +86,7 @@ Pin a single one with `cloophole dir <path>`.
 | `daemon_tick_sec` | `15` | watcher loop cadence |
 | `poll_enabled` | `false` | idle auto-detection (`cloophole poll on`) |
 | `poll_interval_min` | `30` | gentle — probing costs quota |
+| `ui_enabled` | `true` | daemon serves the status page itself |
 | `ui_port` | `8787` | local status page |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched for the live gate |

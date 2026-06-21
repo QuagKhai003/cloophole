@@ -3,7 +3,7 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (one-command no-admin install; single-instance daemon; git; multi-dir fire; Phase 3)
+**Last updated:** 2026-06-22 (daemon serves UI + `open`; one-command no-admin install; single-instance; multi-dir fire)
 
 ## Phase
 Phases 1, 2, 3, 4, and 5.1 (Windows) are **COMPLETE**. Engine, gating, idle poll, UI,

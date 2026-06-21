@@ -2,7 +2,7 @@
 
 @context  The human entry point: report limits, queue work, inspect state, run
           the daemon/UI, install. Thin dispatch over the other modules.
-@done     status/report/arm/queue/dir/clear/fire-now/poll/config/daemon/ui/
+@done     status/report/arm/queue/dir/clear/fire-now/poll/config/daemon/ui/open/
           install/uninstall/start/stop; main() arg dispatch.
 @todo     —
 @limits   install/uninstall are Windows-only in this build.
@@ -19,7 +19,8 @@
   cloophole clear                  back to WATCHING, drop reset/limit
   cloophole config [key [value]]   show / get / set config
   cloophole daemon                 run the watcher loop (foreground)
-  cloophole ui [port]              serve the local status page
+  cloophole open                   open the status page in your browser
+  cloophole ui [port]              serve the status page in the foreground
   cloophole install [--task]       run-at-logon: Startup shim (no admin) or
                                    Task Scheduler (--task); also starts it now
   cloophole uninstall              remove shim + task, stop the daemon
@@ -57,6 +58,8 @@ def cmd_status(_args: list[str]) -> int:
     print(f"last_fired   {st.last_fired or 'never'}")
     if st.last_error:
         print(f"last_error   {st.last_error}")
+    if config.get("ui_enabled"):
+        print(f"ui           http://127.0.0.1:{config.get('ui_port')}")
     return 0
 
 
@@ -179,6 +182,14 @@ def cmd_ui(args: list[str]) -> int:
     return 0
 
 
+def cmd_open(_args: list[str]) -> int:
+    import webbrowser
+    url = f"http://127.0.0.1:{config.get('ui_port')}"
+    print(f"opening {url}")
+    webbrowser.open(url)
+    return 0
+
+
 def cmd_install(args: list[str]) -> int:
     if sys.platform != "win32":
         print("install is Windows-only in this build")
@@ -224,6 +235,7 @@ COMMANDS = {
     "config": cmd_config,
     "daemon": cmd_daemon,
     "ui": cmd_ui,
+    "open": cmd_open,
     "install": cmd_install,
     "uninstall": cmd_uninstall,
     "start": cmd_start,

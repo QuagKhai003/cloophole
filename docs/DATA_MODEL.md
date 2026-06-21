@@ -45,6 +45,7 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `daemon_tick_sec` | `15` | watcher loop cadence |
 | `poll_enabled` | `false` | Phase 3 idle probing (not yet wired) |
 | `poll_interval_min` | `30` | gentle — probing costs quota |
+| `ui_enabled` | `true` | daemon serves the status page on a bg thread |
 | `ui_port` | `8787` | local status page |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched by the live gate |
@@ -66,6 +67,12 @@ Parse order = most explicit first: **ISO** → **relative** → **clock-time**.
 `subproc.run` (no console window). `limited` uses `reset_parser.is_limit_message`
 — the same helper as `fire.still_limited`, so they cannot diverge. Gated by
 `poll_enabled` + `poll_interval_min` + `State.last_poll` in `daemon.tick`.
+
+## UI (`cloophole/ui.py`)
+The daemon serves the status page itself: `daemon.run` calls `ui.start_background(port)`
+(a daemon thread) when `ui_enabled`, so the page is live at `http://127.0.0.1:<ui_port>`
+without a separate process. `cloophole open` launches a browser; `cloophole ui` runs it
+in the foreground. `start_background(0)` binds a free port (used in tests).
 
 ## Install methods (`cloophole/install_win.py`)
 - **shim** (default, no admin): `.vbs` in the user Startup folder, runs the daemon

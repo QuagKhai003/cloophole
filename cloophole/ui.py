@@ -101,6 +101,17 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
+def start_background(port: int | None = None) -> ThreadingHTTPServer:
+    """Serve the UI on a daemon thread and return the server. Used by the daemon
+    so the page is live without a separate `cloophole ui` process. Port 0 picks a
+    free port (read it from `.server_address[1]`)."""
+    import threading
+    port = config.get("ui_port") if port is None else port
+    srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
 def serve(port: int | None = None) -> None:
     port = port or config.get("ui_port")
     srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)

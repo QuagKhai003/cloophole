@@ -180,6 +180,13 @@ def run() -> None:
         return
     pid_file().write_text(str(__import__("os").getpid()), encoding="utf-8")
     log(f"daemon start pid={__import__('os').getpid()} tick={cfg['daemon_tick_sec']}s")
+    if cfg.get("ui_enabled", True):
+        try:
+            from . import ui
+            ui.start_background(cfg["ui_port"])
+            log(f"UI at http://127.0.0.1:{cfg['ui_port']}")
+        except OSError as e:
+            log(f"UI not started ({e}); set a free ui_port or ui_enabled=false")
     try:
         while True:
             try:
