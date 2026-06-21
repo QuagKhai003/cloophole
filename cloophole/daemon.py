@@ -154,8 +154,30 @@ def tick(cfg: dict) -> state.State:
     return st
 
 
+def _already_running() -> bool:
+    """Single-instance guard: another live daemon holds the pid file.
+
+    Makes duplicate launchers (e.g. a leftover Task Scheduler task + the Startup
+    shim) harmless — the second daemon exits instead of double-firing.
+    """
+    if sys.platform != "win32":
+        return False
+    f = pid_file()
+    if not f.exists():
+        return False
+    try:
+        old = int(f.read_text().strip())
+    except (ValueError, OSError):
+        return False
+    from . import winproc
+    return old != __import__("os").getpid() and winproc.pid_alive(old)
+
+
 def run() -> None:
     cfg = config.load()
+    if _already_running():
+        log("another daemon is already running; exiting")
+        return
     pid_file().write_text(str(__import__("os").getpid()), encoding="utf-8")
     log(f"daemon start pid={__import__('os').getpid()} tick={cfg['daemon_tick_sec']}s")
     try:

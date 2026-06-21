@@ -72,8 +72,11 @@ Parse order = most explicit first: **ISO** → **relative** → **clock-time**.
   hidden at logon. `cloophole install`.
 - **task** (opt-in): Task Scheduler ONLOGON. `cloophole install --task` (may need an
   elevated terminal).
-- `install` also calls `start_now()` (detached + hidden) so no reboot is needed.
-- `start` / `stop` manage the running daemon via `daemon.pid`.
+- `install` is idempotent + no-admin: stops the old daemon, best-effort drops a
+  leftover task, writes the shim, and `start_now()` (detached + hidden) — no reboot.
+- `start` / `stop` manage the daemon via `daemon.pid` (liveness-checked).
+- **Single instance:** `daemon.run` exits if a live daemon already holds `daemon.pid`
+  (`winproc.pid_alive`), so duplicate launchers (leftover task + shim) can't double-fire.
 
 ## Filesystem (`cloophole/paths.py`)
 `~/.cloophole/` (or `$CLOOPHOLE_HOME`): `state.json`, `config.json`,

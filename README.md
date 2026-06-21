@@ -32,14 +32,21 @@ State machine: `WATCHING → WAITING → (ARMED) → FIRING → WATCHING`.
 
 ## Install
 
+Two commands. **No administrator rights needed.**
+
 ```powershell
 pip install -e .
-# register run-at-logon (Task Scheduler), then start it now:
 cloophole install
-schtasks /Run /TN cloophole
 ```
 
-Or run the watcher in the foreground without installing:
+That's it — `install` registers a hidden run-at-logon shim (user Startup folder)
+**and** starts the daemon right now. It's idempotent: re-run it any time to restart
+with the latest code. Remove everything with `cloophole uninstall`.
+
+Prefer a Task Scheduler task instead of the Startup shim? `cloophole install --task`
+(that one may prompt for an elevated terminal).
+
+Run the watcher in the foreground without installing:
 
 ```powershell
 python -m cloophole daemon
@@ -51,14 +58,19 @@ python -m cloophole daemon
 cloophole status                       # phase + countdown + live-session
 cloophole report "resets at 5:30 PM"   # parse limit text, arm -> WAITING
 cloophole queue  "finish auth refactor"# what to continue (else: fallback)
-cloophole dir    C:\path\to\project    # override the fire directory
+cloophole dir    C:\path\to\project    # pin one dir (else: fire ALL live sessions)
+cloophole poll   on                    # idle auto-detection of the limit
 cloophole fire-now                     # fire immediately, ignoring the gate
 cloophole arm    "in 2h"               # arm manually (clock / relative / ISO)
 cloophole clear                        # back to WATCHING
 cloophole config [key [value]]         # show / get / set tunables
 cloophole ui [port]                    # local status page (default :8787)
-cloophole uninstall                    # remove the scheduled task
+cloophole start | stop                 # start/stop the background daemon
+cloophole uninstall                    # remove shim/task + stop the daemon
 ```
+
+By default a fire runs `--continue` in **every** live `claude` session's directory.
+Pin a single one with `cloophole dir <path>`.
 
 ## Config
 
@@ -69,7 +81,7 @@ cloophole uninstall                    # remove the scheduled task
 | `claude_path` | `claude` | executable name or full path |
 | `permission_mode` | `acceptEdits` | headless can't answer prompts |
 | `daemon_tick_sec` | `15` | watcher loop cadence |
-| `poll_enabled` | `false` | idle auto-detection (Phase 3, not yet wired) |
+| `poll_enabled` | `false` | idle auto-detection (`cloophole poll on`) |
 | `poll_interval_min` | `30` | gentle — probing costs quota |
 | `ui_port` | `8787` | local status page |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
@@ -79,11 +91,12 @@ State, config, and logs live in `~/.cloophole/` (override with `$CLOOPHOLE_HOME`
 
 ## Status of this build
 
-Done: engine + state machine, reset parser, Windows process/cwd detection, the
-`--continue` fire path, full CLI, local UI, Task Scheduler installer, tests.
+Done: engine + state machine, reset parser, Windows process/cwd detection,
+multi-directory `--continue` fire (hidden window), idle quota poll, full CLI, local
+UI, no-admin Startup-shim installer (+ `start`/`stop`, single-instance daemon), tests.
 
-Not yet: idle quota polling (Phase 3), macOS/Linux detection + installers, a hook
-to auto-capture the limit message and last prompt.
+Not yet: macOS/Linux detection + installers, a hook to auto-capture the limit message
+and last prompt, version-tolerant limit-text patterns.
 
 ## Tests
 

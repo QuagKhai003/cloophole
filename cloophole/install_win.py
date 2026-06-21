@@ -3,8 +3,9 @@
 @context  Make the daemon start at logon and run hidden, with NO admin rights
           by default. Task Scheduler (the old default) needed elevation on some
           machines ("access is denied"), so the shim path is now the default.
-@done     install()/uninstall() default to a Startup-folder .vbs shim (no admin);
-          method="task" uses schtasks. start_now() launches the daemon detached.
+@done     install() is idempotent + no-admin: stops old daemon, drops a leftover
+          task best-effort, writes a Startup .vbs shim, starts detached. method=
+          "task" uses schtasks. start_now/stop are pid-aware (liveness-checked).
 @todo     mac launchd / Linux systemd-user + install.py dispatch (P5, ADR-0003).
 @limits   Windows-only. Shim runs only for the current user at logon.
 @affects  Invoked by CLI install/uninstall/start/stop. Runs
@@ -43,9 +44,15 @@ def _shim_path() -> Path:
 def start_now() -> int:
     """Launch the daemon detached + hidden right now (no reboot needed)."""
     from .paths import pid_file
-    if pid_file().exists():
-        print("daemon already running (pid file present); skipping start")
-        return 0
+    from . import winproc
+    f = pid_file()
+    if f.exists():
+        try:
+            if winproc.pid_alive(int(f.read_text().strip())):
+                print("daemon already running; skipping start")
+                return 0
+        except (ValueError, OSError):
+            pass  # stale pid file — fall through and start
     flags = 0x00000008 | 0x08000000  # DETACHED_PROCESS | CREATE_NO_WINDOW
     subprocess.Popen(
         [_pythonw(), "-m", "cloophole", "daemon"],
@@ -121,20 +128,41 @@ def _install_task() -> int:
     return proc.returncode
 
 
-def _uninstall_task() -> int:
+def _task_exists() -> bool:
+    return subprocess.run(
+        ["schtasks", "/Query", "/TN", TASK_NAME],
+        capture_output=True, text=True,
+    ).returncode == 0
+
+
+def _uninstall_task(quiet: bool = False) -> int:
+    if not _task_exists():
+        return 0
     proc = subprocess.run(
         ["schtasks", "/Delete", "/TN", TASK_NAME, "/F"],
         capture_output=True, text=True,
     )
     if proc.returncode == 0:
-        print(f"removed task '{TASK_NAME}'")
-    else:
-        print((proc.stdout + proc.stderr).strip())
+        print(f"removed old Task Scheduler task '{TASK_NAME}'")
+    elif not quiet:
+        # Deletion of an admin-created task may be denied — harmless now, the
+        # single-instance guard stops a second daemon from double-firing.
+        print(f"note: couldn't remove old task '{TASK_NAME}' (made with admin?). "
+              "Safe to leave — the daemon is single-instance. To remove it once: "
+              "run in an elevated terminal:  schtasks /Delete /TN cloophole /F")
     return proc.returncode
 
 
 def install(method: str = "shim") -> int:
-    rc = _install_task() if method == "task" else _install_shim()
+    """Idempotent, no-admin by default: stop any old daemon, clear the other
+    mechanism, install, and start. Safe to re-run."""
+    stop()  # restart cleanly with the latest code
+    if method == "task":
+        _uninstall_shim()
+        rc = _install_task()
+    else:
+        _uninstall_task(quiet=True)  # best-effort drop a leftover task
+        rc = _install_shim()
     if rc == 0:
         start_now()
     return rc

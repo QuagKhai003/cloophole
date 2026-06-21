@@ -3,7 +3,7 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (git init; dropped template kit; multi-dir fire; Phase 3 + install/window fixes)
+**Last updated:** 2026-06-22 (one-command no-admin install; single-instance daemon; git; multi-dir fire; Phase 3)
 
 ## Phase
 Phases 1, 2, 3, 4, and 5.1 (Windows) are **COMPLETE**. Engine, gating, idle poll, UI,
@@ -25,10 +25,11 @@ Task Scheduler opt-in (`install --task`), `start`/`stop`, and `subproc.run`
   ROADMAP 5.2–5.4; or Phase 6 polish (version-tolerant patterns, log rotation).
 
 ## Watch / before launch
-- **Migrating the user's existing install:** they have an old Task Scheduler task (made
-  as admin) that opens a blank window. To switch to the clean shim: `cloophole uninstall`
-  then `cloophole install` (no admin). If `uninstall` can't delete the admin-made task,
-  delete it once in an elevated terminal: `schtasks /Delete /TN cloophole /F`.
+- **Migrating the user's existing install:** just re-run `cloophole install` (no admin).
+  It stops the old daemon, best-effort drops the leftover admin task, writes the shim,
+  and restarts. If the admin task can't be deleted it's harmless — the daemon is now
+  single-instance (`daemon._already_running`), so no double-fire. (Optional one-time
+  cleanup, elevated: `schtasks /Delete /TN cloophole /F`.)
 - `winproc.py` PEB offsets are **64-bit only** (BUGS B1).
 - The fire path spawns its own `claude.exe`; live gate can momentarily see it (BUGS B2).
 - A resume can land in the wrong/empty conversation if no session cwd was captured

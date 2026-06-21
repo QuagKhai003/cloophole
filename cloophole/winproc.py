@@ -35,6 +35,7 @@ else:  # pragma: no cover - non-Windows import guard
     _ntdll = None
 
 PROCESS_QUERY_INFORMATION = 0x0400
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 PROCESS_VM_READ = 0x0010
 TH32CS_SNAPPROCESS = 0x00000002
 
@@ -155,6 +156,17 @@ def detect(process_name: str) -> tuple[bool, Optional[str]]:
         if cwd:
             return True, cwd
     return True, None
+
+
+def pid_alive(pid: int) -> bool:
+    """True if a process with this pid currently exists."""
+    if _k32 is None or not pid:
+        return False
+    handle = _k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
+    _k32.CloseHandle(handle)
+    return True
 
 
 def detect_all(process_name: str) -> tuple[bool, list[str]]:
