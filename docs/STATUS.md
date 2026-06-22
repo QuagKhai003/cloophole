@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B13 — fix GUI session-list flicker + empty status card)
+**Last updated:** 2026-06-23 (B14 — flicker from orphan daemons: clean-restart + list hold)
 
 ## Active task
+**B14 fix — flicker from duplicate/orphan daemons — DONE on `main`, pending CI +
+user verify.** B13's smoothing only covered one daemon; an orphan from an older build
+kept writing empty `live_dirs`. Fix: `cloophole open` clean-restarts (stop+kill_all
+then launch → one current daemon), and the GUI holds the last good list ~8 refreshes
+before showing empty. 44 tests. Existing orphans clear with a one-time
+`Get-Process cloophole | Stop-Process -Force`.
+
+## (prior) Active task
 **B13 fix — GUI flicker + empty card — DONE on `main`, pending CI + user verify.**
 Daemon keeps last good `live_dirs` on a transient empty PEB read (clears only when no
 session is live); GUI rebuilds rows only when the sorted set of folders changes; the

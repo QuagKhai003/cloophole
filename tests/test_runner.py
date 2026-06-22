@@ -56,6 +56,19 @@ def test_stop_returns_false_when_idle(env):
     assert runner.stop() is False
 
 
+def test_cmd_open_clean_restarts_before_launch(monkeypatch):
+    from cloophole import __main__ as m
+    from cloophole import claude_hook, runner
+    calls = []
+    for fn in ("stop_gui", "stop", "kill_all", "launch", "launch_gui"):
+        monkeypatch.setattr(runner, fn, lambda *a, _n=fn: (calls.append(_n), True)[1])
+    monkeypatch.setattr(claude_hook, "hook_installed", lambda: True)
+    monkeypatch.setattr(claude_hook, "install_hook", lambda: True)
+    m.cmd_open([])
+    # the sweep must happen before we launch a fresh daemon (no duplicates -> no flicker)
+    assert calls.index("kill_all") < calls.index("launch") < calls.index("launch_gui")
+
+
 def test_cmd_sessions_lists_dirs(monkeypatch, capsys):
     from cloophole import __main__ as m
     from cloophole import daemon
