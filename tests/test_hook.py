@@ -65,6 +65,45 @@ def test_install_preserves_foreign_hooks(env):
     assert data["hooks"]["Stop"][0]["hooks"][0]["command"] == "echo mine"
 
 
+def test_hook_schedules_two_rechecks(env, monkeypatch):
+    claude_hook, daemon, state, config = env
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    state.save(state.State(phase=state.WATCHING))
+    claude_hook.record_signal('{"cwd": "C:/p"}')
+    out = daemon.tick(config.load())
+    assert out.phase == state.WAITING
+    assert len(out.recheck_at) == 2  # ~+10min and ~reset-10min, both future
+
+
+def test_recheck_lifts_limit_when_probe_clear(env, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    _, daemon, state, config = env
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    monkeypatch.setattr(daemon.probe, "probe", lambda c: (False, None))  # not limited
+    now = datetime.now(timezone.utc)
+    past = (now - timedelta(minutes=1)).isoformat()
+    future = (now + timedelta(hours=4)).isoformat()
+    state.save(state.State(phase=state.WAITING, reset_at=future, recheck_at=[past]))
+    out = daemon.tick(config.load())
+    assert out.recheck_at == []          # consumed
+    assert out.phase == state.ARMED      # reset pulled to now, no live session -> ARMED
+
+
+def test_recheck_keeps_waiting_when_still_limited(env, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    _, daemon, state, config = env
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    monkeypatch.setattr(daemon.probe, "probe",
+                        lambda c: (True, "usage limit reached, try again in 3h"))
+    now = datetime.now(timezone.utc)
+    past = (now - timedelta(minutes=1)).isoformat()
+    later = (now + timedelta(hours=4)).isoformat()
+    state.save(state.State(phase=state.WAITING, reset_at=later, recheck_at=[past, later]))
+    out = daemon.tick(config.load())
+    assert out.phase == state.WAITING
+    assert len(out.recheck_at) == 1      # consumed the due one, kept the future one
+
+
 def test_daemon_consumes_signal_into_waiting(env, monkeypatch):
     claude_hook, daemon, state, config = env
     monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))

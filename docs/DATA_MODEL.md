@@ -16,6 +16,7 @@ Persisted as `~/.cloophole/state.json`. The single source of truth for the machi
 | `last_error` | str \| None | last fire error |
 | `last_poll` | ISO \| None | last idle probe (gates poll cadence) |
 | `hook_dir` | path \| None | cwd from the rate-limit hook; `_fire_dirs` fallback when no live cwd |
+| `recheck_at` | list[ISO] | pending probe re-checks while WAITING (confirm the limit is real) |
 | `live_session` | bool | last observed gate result |
 | `live_dirs` | list[path] | cwds of every live session, written by the daemon for the GUI list |
 | `excluded_dirs` | list[path] | sessions the user **un-ticked** in the GUI; `_fire_dirs` skips them (ADR-0010) |
@@ -52,6 +53,8 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched by the live gate |
 | `limit_window_hours` | `5` | estimated reset window when the rate-limit hook fires |
+| `recheck_after_min` | `10` | probe to confirm the limit ~10 min after it's detected |
+| `recheck_before_min` | `10` | probe to confirm again ~10 min before the estimated reset |
 
 ## `FireResult` (`cloophole/fire.py`)
 `ok: bool`, `still_limited: bool`, `new_reset_text: str|None`, `stdout`, `stderr`,
@@ -75,6 +78,11 @@ reads + clears it and, from WATCHING/ARMED/FIRED/ERROR, arms WAITING with
 - `install_hook`/`uninstall_hook` touch only our entry (marked by `limit-signal` in the
   command); foreign hooks are preserved. `open` installs; `uninstall`/`hook off` remove.
 - The hook gives no reset *time* (transcript-only) — hence the estimate.
+- **Re-checks:** because the estimate can be wrong (e.g. a plan upgrade clears the limit
+  early), WAITING schedules up to two probes in `recheck_at` (≈ detection+`recheck_after_min`
+  and reset−`recheck_before_min`). A probe that comes back *not limited* pulls `reset_at`
+  to now (resume early); still-limited refines the estimate from the probe text. Two
+  probes per cycle — not continuous polling.
 
 ## Idle probe (`cloophole/probe.py`) — opt-in (OFF by default, B9)
 `probe(cfg) -> (limited: bool, text: str|None)`. Sends one `claude -p` call via

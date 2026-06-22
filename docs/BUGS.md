@@ -35,6 +35,12 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B17 — "Resume ticked sessions" fired nothing** (user-reported 2026-06-23). The GUI
+  button computed targets from `state.live_dirs` (the raw daemon value, momentarily
+  empty between ticks) instead of the **sticky list the user sees and ticks**, so it
+  often found no targets. **Fix:** `do_resume` fires the displayed-ticked folders
+  (`_rendered["dirs"]` − `excluded_dirs`, or the `work_dir` pin). RESOLVED 2026-06-23
+  (`cloophole/gui.py`).
 - **B16 — residual session-list flicker (one folder drops per flaky PEB read)**
   (user-reported 2026-06-23). With one clean daemon, the list still blinked ~every tick:
   the daemon re-detects every `daemon_tick_sec` (15s) and a single session's PEB cwd read

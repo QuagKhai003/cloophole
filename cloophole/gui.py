@@ -73,7 +73,7 @@ def run() -> None:
     import tkinter as tk
     from tkinter import filedialog, messagebox, simpledialog
 
-    from . import claude_hook, daemon, runner
+    from . import claude_hook, runner
 
     if runner.is_gui_running():
         return
@@ -281,7 +281,13 @@ def run() -> None:
     def do_resume():
         save_note()
         st = state.load()
-        targets = daemon._fire_dirs(st, list(st.live_dirs or []))
+        # Fire the folders the user actually SEES ticked (the sticky displayed list),
+        # not the raw live_dirs which can be momentarily empty between daemon ticks.
+        if st.work_dir:
+            targets = [st.work_dir]
+        else:
+            ex = set(st.excluded_dirs or [])
+            targets = [d for d in (_rendered["dirs"] or []) if d not in ex]
         if not targets:
             messagebox.showinfo("cloophole", "No sessions are ticked to resume.")
             return
