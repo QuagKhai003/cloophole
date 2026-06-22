@@ -211,6 +211,8 @@ def run() -> None:
 
     root.protocol("WM_DELETE_WINDOW", lambda: (_cleanup(), root.destroy()))
     refresh()
+    import gc
+    gc.collect()  # drop import/build garbage before the window goes idle
     try:
         root.mainloop()
     finally:
