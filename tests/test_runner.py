@@ -56,6 +56,23 @@ def test_stop_returns_false_when_idle(env):
     assert runner.stop() is False
 
 
+def test_cmd_sessions_lists_dirs(monkeypatch, capsys):
+    from cloophole import __main__ as m
+    from cloophole import daemon
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (True, ["C:/a/proj"]))
+    m.cmd_sessions([])
+    out = capsys.readouterr().out
+    assert "proj" in out and "C:/a/proj" in out
+
+
+def test_cmd_sessions_none(monkeypatch, capsys):
+    from cloophole import __main__ as m
+    from cloophole import daemon
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    m.cmd_sessions([])
+    assert "no live Claude session" in capsys.readouterr().out
+
+
 def test_gui_helpers():
     from cloophole import gui, state
     st = state.State(phase=state.WAITING, reset_at="2099-01-01T00:00:00+00:00")

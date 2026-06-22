@@ -11,6 +11,7 @@
   cloophole open                   start the watcher + open the app window
   cloophole close                  stop the watcher + close the window
   cloophole status                 show state + countdown
+  cloophole sessions               list live Claude sessions (by folder)
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
   cloophole queue "<note>"         set what to continue
   cloophole dir <path>             pin one dir (else fire all live sessions)
@@ -93,6 +94,25 @@ def cmd_queue(args: list[str]) -> int:
     st.queue_note = " ".join(args)
     state.save(st)
     print(f"queued: {st.queue_note}")
+    return 0
+
+
+def cmd_sessions(_args: list[str]) -> int:
+    """List the live Claude sessions cloophole detects, named by folder."""
+    from pathlib import Path
+
+    from . import daemon
+    live, dirs = daemon.detect_sessions(config.load())
+    if not live:
+        print("no live Claude session detected.")
+        return 0
+    if dirs:
+        print(f"{len(dirs)} live Claude session(s):")
+        for d in dirs:
+            print(f"  - {Path(d).name or d}   ({d})")
+    else:
+        print("Claude is running, but no session folder was readable "
+              "(see BUGS B1/B6).")
     return 0
 
 
@@ -333,6 +353,7 @@ COMMANDS = {
     "hook": cmd_hook,
     "close": cmd_close,
     "status": cmd_status,
+    "sessions": cmd_sessions,
     "report": cmd_report,
     "arm": cmd_arm,
     "queue": cmd_queue,
