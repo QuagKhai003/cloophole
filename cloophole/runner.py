@@ -1,9 +1,9 @@
-"""Launch / attach / stop the background tray app (ADR-0003).
+"""Launch / attach / stop the background watcher daemon (ADR-0003/0006).
 
-@context  `cloophole open` is launch-or-attach: start the detached tray app if
-          it isn't running, otherwise leave the existing one be. `close` stops
-          it. No run-at-logon — the user starts it explicitly with `open`.
-@done     is_running(), pid(), launch() (detached + hidden tray), stop().
+@context  `cloophole open` is launch-or-attach: start the detached background
+          watcher daemon if it isn't running, then show the terminal menu.
+          `close` stops it. No run-at-logon — started explicitly via `open`.
+@done     is_running(), pid(), launch() (detached + hidden daemon), stop().
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
 @limits   Windows-first; launch uses pythonw + DETACHED_PROCESS|CREATE_NO_WINDOW.
 @affects  Used by CLI open/close/uninstall. Process holds daemon.pid.
@@ -47,22 +47,22 @@ def _pythonw() -> str:
     return str(cand if cand.exists() else exe)
 
 
-def _app_command() -> list[str]:
-    """Command that launches the tray app. As a frozen exe, relaunch ourselves;
-    from source, use pythonw -m cloophole."""
+def _daemon_command() -> list[str]:
+    """Command that launches the background watcher. As a frozen exe, relaunch
+    ourselves; from source, use pythonw -m cloophole (no console window)."""
     if getattr(sys, "frozen", False):
-        return [sys.executable, "_app"]
-    return [_pythonw(), "-m", "cloophole", "_app"]
+        return [sys.executable, "daemon"]
+    return [_pythonw(), "-m", "cloophole", "daemon"]
 
 
 def launch() -> bool:
-    """Start the tray app detached + hidden. Returns False if already running."""
+    """Start the background daemon detached + hidden. False if already running."""
     if is_running():
         return False
     kwargs = {}
     if sys.platform == "win32":
         kwargs["creationflags"] = DETACHED
-    subprocess.Popen(_app_command(), close_fds=True, **kwargs)
+    subprocess.Popen(_daemon_command(), close_fds=True, **kwargs)
     return True
 
 

@@ -43,10 +43,8 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `claude_path` | `claude` | executable name / full path |
 | `permission_mode` | `acceptEdits` | non-interactive; headless can't confirm |
 | `daemon_tick_sec` | `15` | watcher loop cadence |
-| `poll_enabled` | `false` | Phase 3 idle probing (not yet wired) |
+| `poll_enabled` | `false` | idle probing (`cloophole poll on`) |
 | `poll_interval_min` | `30` | gentle — probing costs quota |
-| `ui_enabled` | `true` | daemon serves the status page on a bg thread |
-| `ui_port` | `8787` | local status page |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched by the live gate |
 
@@ -68,25 +66,23 @@ Parse order = most explicit first: **ISO** → **relative** → **clock-time**.
 — the same helper as `fire.still_limited`, so they cannot diverge. Gated by
 `poll_enabled` + `poll_interval_min` + `State.last_poll` in `daemon.tick`.
 
-## UI (`cloophole/ui.py`)
-The daemon serves the status page itself: `daemon.run` calls `ui.start_background(port)`
-(a daemon thread) when `ui_enabled`, so the page is live at `http://127.0.0.1:<ui_port>`
-without a separate process. `cloophole open` launches a browser; `cloophole ui` runs it
-in the foreground. `start_background(0)` binds a free port (used in tests).
+## UI — terminal menu (`cloophole/menu.py`)
+`menu.run()` is the interface (ADR-0006): a clear-screen status header (daemon up?,
+phase, countdown, live session, work dir, queue, poll) + numbered actions (fire now,
+set queue note, report limit, toggle poll, pin/clear dir, clear, refresh, stop daemon,
+quit). Blocking `input()` loop; quitting leaves the daemon running. Stdlib only — no
+web, no tray. (`ui.py` and `app.py` were removed.)
 
-## App lifecycle (`cloophole/app.py`, `runner.py`, `daemon.py`)
-- **Tray app** = one background process: `app.TrayApp.run()` claims `daemon.pid`, starts
-  the UI server + `daemon.loop` on daemon threads, then runs the pystray icon on the
-  main thread. Menu: Open dashboard / Fire now / Idle poll toggle / Set queue note
-  (tkinter) / Quit. A refresh thread recolors the icon, updates the title (phase +
-  countdown), and toasts on entering FIRING.
-- **`open`** (`runner.launch`): if `runner.is_running()` (pid + `winproc.pid_alive`),
-  attach (do nothing); else spawn `pythonw -m cloophole _app` detached + hidden.
-- **`close`** (`runner.stop`): taskkill the pid tree; clears the pid file.
-- **`uninstall`**: `runner.stop()` + remove `~/.cloophole` + best-effort clear legacy
-  autostart (`install_win._uninstall_shim/_task`).
-- **Single instance:** both `app.run` and `daemon.run` exit if a live process already
-  holds `daemon.pid`. No run-at-logon (ADR-0003).
+## App lifecycle (`cloophole/runner.py`, `daemon.py`, `menu.py`)
+- **Background watcher** = a detached, hidden, single-instance daemon process running
+  `daemon.run` (claims `daemon.pid`, runs `daemon.loop`).
+- **`open`**: `runner.launch()` (spawn `pythonw -m cloophole daemon` / frozen exe
+  `daemon`, detached + no window) if not running, then `menu.run()`.
+- **`menu`**: just `menu.run()`. **`close`**: `runner.stop()` (taskkill pid tree).
+- **`uninstall`**: `runner.stop()` + remove `~/.cloophole` + legacy autostart cleanup;
+  exe build also drops PATH + deletes its install dir.
+- **Single instance:** `daemon.run` exits if a live process already holds `daemon.pid`
+  (`winproc.pid_alive`). No run-at-logon.
 - `cloophole/install_win.py` is **legacy** — autostart cleanup for old installs only.
 
 ## Filesystem (`cloophole/paths.py`)

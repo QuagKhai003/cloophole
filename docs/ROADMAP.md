@@ -29,15 +29,24 @@
 |---|------|--------|
 | 4.1 | stdlib status page + `/state` JSON | ✅ |
 
-## Phase A — Desktop tray app — COMPLETE (ADR-0003)
-**Goal:** feel like an installed app — tray icon, no terminal/browser needed.
+## Phase A — App lifecycle — COMPLETE (ADR-0003)
+**Goal:** installed-feeling app; explicit start, background, single-instance.
 
 | # | Task | Status |
 |---|------|--------|
 | A1 | extract `daemon.loop(cfg, stop)` from `run()` | ✅ |
 | A2 | `runner.py` launch/attach/stop (`open`/`close`) | ✅ |
-| A3 | `app.py` tray: menu, dynamic icon/title, toast, queue dialog | ✅ |
+| A3 | ~~tray app~~ → replaced by terminal menu (Phase C) | ↩ |
 | A4 | CLI `open`/`close`/`uninstall`; drop run-at-logon | ✅ |
+
+## Phase C — Terminal menu UI — COMPLETE (ADR-0006)
+**Goal:** interactive terminal menu; no web, no tray, zero deps.
+
+| # | Task | Status |
+|---|------|--------|
+| C1 | `menu.py` status header + numbered actions | ✅ |
+| C2 | remove `ui.py`/`app.py`, pystray/Pillow, `ui_*` config | ✅ |
+| C3 | `open`/`menu`/`close`; `runner.launch` → background daemon | ✅ |
 
 ## Phase 5 (partial) — Windows autostart — SUPERSEDED by ADR-0003
 | # | Task | Status |

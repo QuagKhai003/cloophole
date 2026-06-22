@@ -46,7 +46,7 @@ def test_launch_spawns_when_not_running(env, monkeypatch):
     calls = []
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **k: calls.append(a))
     assert runner.launch() is True
-    assert calls and "_app" in calls[0][0]
+    assert calls and "daemon" in calls[0][0]
 
 
 def test_stop_returns_false_when_idle(env):
@@ -54,10 +54,9 @@ def test_stop_returns_false_when_idle(env):
     assert runner.stop() is False
 
 
-def test_app_helpers():
-    from cloophole import app, state
-    img = app.make_image((1, 2, 3))
-    assert img.size == (64, 64)
+def test_menu_helpers():
+    from cloophole import menu, state
     st = state.State(phase=state.WAITING, reset_at="2099-01-01T00:00:00+00:00")
-    title = app._title(st)
-    assert title.startswith("cloophole — WAITING")
+    cd = menu._countdown(st)
+    assert cd and cd != "-"
+    assert menu._countdown(state.State()) == "-"

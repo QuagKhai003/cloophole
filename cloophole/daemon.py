@@ -3,8 +3,9 @@
 @context  The loop that enforces "never fire blind": each tick reloads state,
           checks the reset clock + live gate, and only then fires.
 @done     tick() (WATCHING poll + WAITING/ARMED transitions), _do_fire (fires in
-          every live session dir, or a pinned work_dir), detect_sessions, run().
-@todo     non-Windows detect (P5, ADR-0003).
+          every live session dir, or a pinned work_dir), detect_sessions,
+          claim_pid/release_pid/loop/run (single-instance background watcher).
+@todo     non-Windows detect (P5).
 @limits   detect_sessions returns (False, []) off Windows in this build.
 @affects  Reads/writes state; calls winproc.detect_all + fire.fire + probe.probe.
           Cadence = config daemon_tick_sec. Transitions documented in DATA_MODEL.
@@ -191,9 +192,7 @@ def release_pid() -> None:
 def loop(cfg: dict, stop: "object | None" = None) -> None:
     """Run ticks until `stop` (a threading.Event) is set, or forever.
 
-    Shared by the foreground `run()` and the tray app's background thread. Does
-    NOT manage the pid file — the caller owns that (so the tray icon can outlive
-    a single loop and the guard stays authoritative).
+    Does NOT manage the pid file — `run()` owns that.
     """
     import threading
     stop = stop or threading.Event()
@@ -206,25 +205,13 @@ def loop(cfg: dict, stop: "object | None" = None) -> None:
         stop.wait(interval)
 
 
-def start_ui(cfg: dict) -> None:
-    if not cfg.get("ui_enabled", True):
-        return
-    try:
-        from . import ui
-        ui.start_background(cfg["ui_port"])
-        log(f"UI at http://127.0.0.1:{cfg['ui_port']}")
-    except OSError as e:
-        log(f"UI not started ({e}); set a free ui_port or ui_enabled=false")
-
-
 def run() -> None:
-    """Foreground daemon (headless; `cloophole daemon`)."""
+    """The background watcher loop (foreground process; detached by `open`)."""
     cfg = config.load()
     if not claim_pid():
         log("another daemon is already running; exiting")
         return
     log(f"daemon start pid={__import__('os').getpid()} tick={cfg['daemon_tick_sec']}s")
-    start_ui(cfg)
     try:
         loop(cfg)
     except KeyboardInterrupt:

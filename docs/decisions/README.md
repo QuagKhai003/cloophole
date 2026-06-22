@@ -10,6 +10,7 @@ Copy `0000-template.md` → `NNNN-<slug>.md` and link it below.
 |---|-------|--------|
 | 0001 | Windows-first engine, gating, UI, installer | Accepted — COMPLETE |
 | 0002 | Idle quota poll | Accepted — COMPLETE |
-| 0003 | Desktop tray app (no terminal/browser/logon) | Accepted — COMPLETE |
+| 0003 | Desktop tray app (no terminal/browser/logon) | Partly superseded by 0006 (tray/web dropped; open/close kept) |
 | 0004 | Polish: version-tolerant patterns, logging, hot-reload | Planned |
 | 0005 | Standalone .exe + one-line PowerShell installer | Accepted — COMPLETE |
+| 0006 | Terminal menu UI (drop web dashboard + tray) | Accepted — COMPLETE |
