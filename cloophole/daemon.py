@@ -70,7 +70,9 @@ def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
     if st.work_dir:
         return [st.work_dir]
     if cwds:
-        return list(cwds)
+        excluded = set(st.excluded_dirs or [])
+        selected = [d for d in cwds if d not in excluded]
+        return selected  # may be [] if the user un-ticked every live session
     if st.hook_dir:  # no live cwd readable -> fall back to where the limit hit
         return [st.hook_dir]
     return [None]
@@ -78,6 +80,10 @@ def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
 
 def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
     dirs = _fire_dirs(st, cwds)
+    if not dirs:  # user un-ticked every detected session -> nothing to resume
+        log("no selected sessions to fire (all un-ticked); staying put")
+        state.save(st)
+        return
     st.phase = state.FIRING
     state.save(st)
     log(f"FIRING in {len(dirs)} dir(s): {dirs} note={st.queue_note!r}")

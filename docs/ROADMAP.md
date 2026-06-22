@@ -100,6 +100,16 @@ default (poll stays opt-in). Supersedes ADR-0002 for everyday use.
 | I2 | wire into `close` + `uninstall`; `uninstall` deregisters the hook | ✅ |
 | I3 | `uninstall.ps1` kills by name + `hook off` + PATH/exe/data removal | ✅ |
 
+## Phase J — Session tick boxes + GUI redesign — COMPLETE (ADR-0010)
+**Goal:** see every detected session in the window, tick which to resume (default all),
+and a modern look that never clips the list.
+
+| # | Task | Status |
+|---|------|--------|
+| J1 | `state.excluded_dirs`; `_fire_dirs` = ticked live dirs; `_do_fire` no-op on empty | ✅ |
+| J2 | GUI scrollable per-session checkboxes + all/none; resume fires ticked | ✅ |
+| J3 | Visual polish: phase badge, bordered cards, button hover, bottom-pinned actions | ✅ |
+
 ## Phase 6 — Polish — PLANNED (ADR-0004)
 | # | Task | Status |
 |---|------|--------|
