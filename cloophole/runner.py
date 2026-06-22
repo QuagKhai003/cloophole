@@ -8,13 +8,15 @@
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
 @limits   Windows-first; launch uses pythonw + CREATE_NO_WINDOW only (NOT
           DETACHED_PROCESS, which un-hides the console; NOT STARTUPINFO SW_HIDE,
-          which hides the GUI window too — B10), stdio -> DEVNULL so the child has
-          valid handles, no blank terminal, and the window still shows.
+          which hides the GUI window too — B10), stdio -> DEVNULL, and a child env
+          stripped of PyInstaller `_MEI`/`_PYI` vars so the onefile self-spawn loads
+          its own tcl/tk and the window actually appears (B11).
 @affects  Used by CLI open/close/uninstall. Process holds daemon.pid.
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -80,6 +82,20 @@ def _cmd(sub: str) -> list[str]:
     return [_pythonw(), "-m", "cloophole", sub]
 
 
+def _child_env() -> dict[str, str]:
+    """Environment for a spawned child, minus PyInstaller's bootstrap vars.
+
+    When the frozen onefile exe spawns ITSELF (e.g. `open` -> `_gui`), the child
+    must not inherit `_MEIPASS2` / `_PYI_*`: those make the child's bootloader
+    attach to the PARENT's `_MEI` temp dir, which the parent deletes on exit. The
+    child then can't load its bundled tcl/tk, so the Tk window never appears (B11) —
+    and the parent logs "Failed to remove temporary directory _MEI...". Stripping
+    them lets the child extract its own copy, exactly like a clean launch.
+    """
+    return {k: v for k, v in os.environ.items()
+            if not (k.startswith("_MEI") or k.startswith("_PYI"))}
+
+
 def _spawn(sub: str) -> None:
     # Silence std handles: a windowless child has no usable console, so inherited
     # stdout/stderr are invalid and the first write (e.g. Tk startup in the `_gui`
@@ -88,6 +104,7 @@ def _spawn(sub: str) -> None:
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,
         "stderr": subprocess.DEVNULL,
+        "env": _child_env(),
     }
     if sys.platform == "win32":
         # CREATE_NO_WINDOW alone suppresses the console for this console-subsystem

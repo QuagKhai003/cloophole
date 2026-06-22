@@ -3,9 +3,18 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B10 — GUI opened hidden; SW_HIDE regression from B8)
+**Last updated:** 2026-06-23 (B11 — onefile self-spawn: no window + _MEI warning)
 
 ## Active task
+**B11 fix — `cloophole open` shows no window — DONE (branch
+`fix/onefile-self-spawn-env`), awaiting user verify.** The frozen exe spawning itself
+let the child inherit `_MEIPASS2`/`_PYI_*`, so it bound to the parent's `_MEI` temp
+(deleted on exit) and couldn't load tcl/tk → no Tk window. Proven by: a python-parent
+spawn with identical flags DID show the window. Fix: strip `_MEI*`/`_PYI*` from the
+child env in `runner._spawn`. Also kills the `_MEI` cleanup warning. 30 tests.
+The window itself (B7/B8/B10) is already confirmed working via the foreground `_gui`.
+
+## (prior) Active task
 **B10 fix — GUI opened hidden (no window) — DONE (branch
 `fix/gui-window-hidden-swhide`), awaiting user verify.** B8's anti-console
 `STARTUPINFO SW_HIDE` also hid the Tk window (nCmdShow=SW_HIDE). Fix: `CREATE_NO_WINDOW`

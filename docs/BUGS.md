@@ -47,6 +47,17 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B11 — `cloophole open` shows no window; `_MEI` temp warning (onefile self-spawn)**
+  (user-reported 2026-06-23). The decisive clue: a python-parent spawn of
+  `cloophole.exe _gui` with the *same* flags opened the window, but `cloophole open`
+  (frozen-parent spawn of itself) did not. Cause: the frozen onefile child inherited
+  the parent's `_MEIPASS2`/`_PYI_*` bootstrap vars, so its bootloader attached to the
+  PARENT's `_MEI` temp dir — which the parent deletes on exit (hence the recurring
+  "Failed to remove temporary directory _MEI..." warning). The child then can't load
+  its bundled tcl/tk, so no Tk window appears. **Fix:** `runner._spawn` passes a child
+  env stripped of `_MEI*`/`_PYI*`, so the child extracts its own copy like a clean
+  launch. Resolves the no-window AND the `_MEI` warning together.
+  RESOLVED 2026-06-23 (`cloophole/runner.py`). Confirmed by user on the frozen exe.
 - **B10 — GUI opens hidden (no window) — SW_HIDE regression from B8**
   (user-reported 2026-06-23). The B8 fix added `STARTUPINFO` with
   `STARTF_USESHOWWINDOW | SW_HIDE` to kill the console. But that `wShowWindow=SW_HIDE`
