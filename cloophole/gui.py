@@ -92,6 +92,27 @@ def run() -> None:
         return tk.Frame(parent, bg=PANEL, highlightbackground=BORDER,
                         highlightthickness=1, **kw)
 
+    # Detect sessions ourselves (OS process inspection — Golden-Rule-fine) on a
+    # background thread, rather than depend on the daemon writing live_dirs to state
+    # at just the right moment (a spawned GUI could otherwise read it empty forever).
+    import time as _time
+
+    from . import config as _config, daemon as _daemon
+    _detected = {"dirs": [], "live": False}
+
+    def _detect_loop():
+        while True:
+            try:
+                live, dirs = _daemon.detect_sessions(_config.load())
+                _detected["live"] = live
+                if dirs or not live:  # keep last good on a transient empty read
+                    _detected["dirs"] = list(dirs)
+            except Exception:
+                pass
+            _time.sleep(3)
+
+    threading.Thread(target=_detect_loop, daemon=True).start()
+
     # ---------- header ----------
     head = tk.Frame(root, bg=BG)
     head.pack(fill="x", padx=20, pady=(16, 6))
@@ -231,7 +252,7 @@ def run() -> None:
     def _effective_dirs() -> list:
         _ticks["n"] += 1
         now = _ticks["n"]
-        for d in state.load().live_dirs or []:
+        for d in _detected["dirs"] or []:
             _seen[d] = now
         for d in [d for d, t in _seen.items() if now - t > _STICKY]:
             del _seen[d]
@@ -254,7 +275,7 @@ def run() -> None:
             w.destroy()
         if not dirs:
             msg = ("a Claude session is open but its folder is unreadable"
-                   if st.live_session else "no Claude session detected right now")
+                   if _detected["live"] else "no Claude session detected right now")
             lbl(sess_holder, "•  " + msg, SUB, ("Segoe UI", 9), bg=PANEL).pack(
                 anchor="w", padx=8, pady=10)
             _update_count()
@@ -364,25 +385,30 @@ def run() -> None:
 
     # ---------- live refresh ----------
     def refresh():
-        st = state.load()
-        running = runner.is_running()
-        v_status.config(text=_PHASE_PLAIN.get(st.phase, st.phase))
-        v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
-        if st.reset_at:
-            v_count.config(text=_countdown(st))
-            if not v_count.winfo_ismapped():
-                v_count.pack(anchor="w", padx=16, before=v_meta)
-        elif v_count.winfo_ismapped():
-            v_count.pack_forget()
-        where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
-        meta = (f"Watcher {'running' if running else 'stopped'}   ·   "
-                f"Claude open now: {'yes' if st.live_session else 'no'}\n"
-                f"Resume in: {where}")
-        if st.last_error:
-            meta += f"\nLast problem: {st.last_error}"
-        v_meta.config(text=meta)
-        _render_sessions()
-        root.after(1000, refresh)
+        # Never let one bad refresh kill the loop — always reschedule in `finally`.
+        try:
+            st = state.load()
+            running = runner.is_running()
+            v_status.config(text=_PHASE_PLAIN.get(st.phase, st.phase))
+            v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
+            if st.reset_at:
+                v_count.config(text=_countdown(st))
+                if not v_count.winfo_ismapped():
+                    v_count.pack(anchor="w", padx=16, before=v_meta)
+            elif v_count.winfo_ismapped():
+                v_count.pack_forget()
+            where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
+            meta = (f"Watcher {'running' if running else 'stopped'}   ·   "
+                    f"Claude open now: {'yes' if _detected['live'] else 'no'}\n"
+                    f"Resume in: {where}")
+            if st.last_error:
+                meta += f"\nLast problem: {st.last_error}"
+            v_meta.config(text=meta)
+            _render_sessions()
+        except Exception:
+            pass
+        finally:
+            root.after(1000, refresh)
 
     def _cleanup():
         try:

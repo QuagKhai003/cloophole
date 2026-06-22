@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (limit re-check probes + fix Resume-ticked firing)
+**Last updated:** 2026-06-23 (B18 — GUI self-detects sessions; refresh loop hardened)
 
 ## Active task
+**B18 fix — spawned GUI showed no sessions — DONE on `main`, pending CI + user verify.**
+State + CLI detected fine, but the `open`-spawned window showed none (foreground did):
+the GUI relied on the daemon writing `live_dirs` + a fragile 1s refresh loop. Fix: the
+GUI now detects sessions itself on a background thread (OS inspection), independent of
+daemon timing, and `refresh()` always reschedules in `finally`. 47 tests. Resume fix
+(B17) + re-check probes already on main.
+
+## (prior) Active task
 **Limit re-check + Resume fix — DONE on `main`, pending CI + user verify.**
 (1) B17: "Resume ticked sessions" fired nothing — it read raw `live_dirs` not the sticky
 ticked list; now fires the displayed-ticked folders. (2) Re-check: WAITING schedules two
