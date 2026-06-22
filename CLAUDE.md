@@ -19,8 +19,8 @@ gate is process detection; "what to resume" comes from the user's queue note, no
 from Claude's memory. If a feature needs to cross this line, stop and redesign.
 
 ## Tech stack
-- **Language:** Python 3.10+ (developed on 3.14). **Stdlib only, no runtime deps.**
-- **UI:** an interactive terminal menu (`menu.py`) — no web, no tray, no GUI toolkit.
+- **Language:** Python 3.10+ (developed on 3.14). **Stdlib only, no third-party deps.**
+- **UI:** a native desktop window via stdlib **Tkinter** (`gui.py`) — no web, no tray.
 - **Windows process/cwd detection:** `ctypes` reading the target PEB (no psutil).
 - **Background watcher:** a detached, hidden, single-instance daemon process.
 - **No run-at-logon:** started explicitly with `cloophole open` (ADR-0003/0006).
@@ -41,8 +41,8 @@ cloophole/        # the package — one module per responsibility
   probe.py        #   idle quota probe
   subproc.py      #   no-window subprocess wrapper
   daemon.py       #   watcher loop + transitions (claim_pid/loop/run)
-  menu.py         #   interactive terminal menu (the UI)
-  runner.py       #   launch/attach/stop the background daemon (open/close)
+  gui.py          #   desktop window (Tkinter) — the UI
+  runner.py       #   launch/stop the daemon + GUI window (open/close)
   install_win.py  #   LEGACY autostart cleanup (uninstall only)
   __main__.py     #   CLI dispatch
 packaging/        # PyInstaller entry.py + cloophole.spec -> cloophole.exe
@@ -56,22 +56,21 @@ README.md                       # user-facing readme
 ## How to run
 ```bash
 pip install -e .            # first time: installs the `cloophole` command (stdlib)
-cloophole open              # start background daemon + open the terminal menu
-cloophole menu              # just the menu
-cloophole close             # stop the daemon
-python -m cloophole daemon  # run the watcher in the foreground
+cloophole open              # start background watcher + open the app window
+cloophole close             # stop the watcher + close the window
+python -m cloophole daemon  # run the watcher in the foreground (headless)
 python -m pytest -q         # fast/offline suite
 ```
 
 ## Current state (read docs/STATUS.md for live detail)
 - **Done & working:** engine + state machine, reset parser, Windows process/cwd
   detection (verified vs real `claude.exe`), `--continue` fire in **all** live session
-  dirs (or a pinned one) hidden, idle quota poll, **interactive terminal menu** +
-  single-instance background daemon (`open`/`menu`/`close`), standalone exe + one-line
+  dirs (or a pinned one) hidden, idle quota poll, **desktop window (Tkinter)** +
+  single-instance background watcher (`open`/`close`), standalone exe + one-line
   installer, full CLI.
 - **In flight:** none — pick the next ADR.
 - **Next direction:** cross-platform mac/Linux detection (Phase 5); Phase 6 polish.
-- **Tests:** 25 passing — `python -m pytest -q`.
+- **Tests:** 27 passing — `python -m pytest -q`.
 
 ## New here?
 Start at `docs/ONBOARDING.md`. `docs/CONVENTIONS.md` is the mandatory hygiene contract.

@@ -18,8 +18,8 @@ way — it's the contract everyone follows.
   pattern ⇒ new test, including garbage-returns-None.
 - **Windows internals** → `cloophole/winproc.py` (ctypes PEB), `install_win.py`.
   PEB offsets are 64-bit; see BUGS B1.
-- **UI / lifecycle** → `cloophole/menu.py` (terminal menu), `runner.py` (open/close),
-  `daemon.py` (`claim_pid`/`loop`). Stdlib only — no web/tray/GUI deps.
+- **UI / lifecycle** → `cloophole/gui.py` (Tkinter window), `runner.py` (open/close,
+  daemon + GUI), `daemon.py` (`claim_pid`/`loop`). Stdlib only (tkinter) — no web/tray.
 - **CLI** → `cloophole/__main__.py`. Thin dispatch over the modules.
 
 ## Your first task

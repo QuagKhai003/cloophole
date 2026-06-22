@@ -3,37 +3,29 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (auto-watch on by default — no manual report needed)
-
-## Phase
-Phases 1–4 + **A (app lifecycle)** + **B (distribution)** + **C (terminal menu UI,
-ADR-0006)** are **COMPLETE** on Windows. UI is now a terminal menu (`cloophole open`)
-— web dashboard + tray removed, back to **zero runtime deps**. 25 tests green. Next:
-cross-platform (mac/Linux detection), then Phase 6 polish.
-Branch: feature work now on per-feature branches (e.g. `feat/terminal-menu`).
+**Last updated:** 2026-06-22 (dedicated desktop window — Tkinter, ADR-0007; replaced terminal menu)
 
 ## Active task
-**Phase C — terminal menu UI (ADR-0006) — DONE (branch `feat/terminal-menu`).**
-Replaced the web dashboard + tray with `menu.py` (stdlib terminal menu: status header
-+ fire/queue/report/poll/dir/clear/stop actions). Removed `ui.py`, `app.py`, the
-`pystray`/`Pillow` deps, `tkinter`, and the `ui_enabled`/`ui_port` config + daemon UI
-hookup → back to zero runtime deps. `runner.launch` now starts the background watcher
-daemon; CLI is `open` (daemon + menu) / `menu` / `close`. 25 tests green; menu render +
-detached-daemon lifecycle verified live. **Pending:** merge `feat/terminal-menu` → main.
-**NEXT:** cross-platform detection (mac/Linux), or Phase 6 polish.
+**Phase D — desktop GUI window (ADR-0007) — DONE (branch `feat/gui-window`).**
+Replaced the terminal menu with `gui.py` (Tkinter window: live status, note field,
+auto-detect checkbox, buttons for resume/limit/folder/reset/stop). `runner` gained
+`gui.pid` + `is_gui_running`/`launch_gui`/`stop_gui`; `open` now starts the watcher +
+spawns the GUI detached (single-instance); removed `menu.py`/`menu` cmd; spec
+re-includes tkinter. Exe ~11 MB pre-UPX. 27 tests; verified window from source + exe.
+**Pending:** merge `feat/gui-window` → main.
+
+## Phase
+Done on Windows: 1–4 (engine/gating/poll), A (app lifecycle), B (distribution: exe +
+`irm` installer, build-on-push CI), C (terminal menu — superseded), **D (desktop GUI
+window, ADR-0007)**. UI is a Tkinter window; install is one PowerShell line; auto-watch
+on by default. 27 tests green, all on per-feature branches.
 
 ## Next action (whoever picks this up)
-- **Before the `irm` one-liner works:** repo set to `QuagKhai003/cloophole` in
-  scripts/README — now just push to GitHub and cut one `v*` tag (CI builds the exe).
-- Cross-platform: mac/Linux process detection + tray + cwd (`/proc`), new ADR.
+- Cross-platform: mac/Linux process detection + cwd (`/proc`) + GUI check, new ADR.
 - Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
+- Optional: onedir build (faster startup, no `_MEI` temp) if size allows.
 
 ## Watch / before launch
-- **Migrating the user's existing install:** just re-run `cloophole install` (no admin).
-  It stops the old daemon, best-effort drops the leftover admin task, writes the shim,
-  and restarts. If the admin task can't be deleted it's harmless — the daemon is now
-  single-instance (`daemon._already_running`), so no double-fire. (Optional one-time
-  cleanup, elevated: `schtasks /Delete /TN cloophole /F`.)
 - `winproc.py` PEB offsets are **64-bit only** (BUGS B1).
 - The fire path spawns its own `claude.exe`; live gate can momentarily see it (BUGS B2).
 - A resume can land in the wrong/empty conversation if no session cwd was captured

@@ -54,9 +54,18 @@ def test_stop_returns_false_when_idle(env):
     assert runner.stop() is False
 
 
-def test_menu_helpers():
-    from cloophole import menu, state
+def test_gui_helpers():
+    from cloophole import gui, state
     st = state.State(phase=state.WAITING, reset_at="2099-01-01T00:00:00+00:00")
-    cd = menu._countdown(st)
+    cd = gui._countdown(st)
     assert cd and cd != "-"
-    assert menu._countdown(state.State()) == "-"
+    assert gui._countdown(state.State()) == "-"
+
+
+def test_gui_launch_skips_when_running(env, monkeypatch):
+    runner, _ = env
+    monkeypatch.setattr(runner, "is_gui_running", lambda: True)
+    spawned = {"n": 0}
+    monkeypatch.setattr(runner, "_spawn", lambda sub: spawned.__setitem__("n", spawned["n"] + 1))
+    assert runner.launch_gui() is False
+    assert spawned["n"] == 0

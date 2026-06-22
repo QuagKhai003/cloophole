@@ -66,23 +66,26 @@ Parse order = most explicit first: **ISO** → **relative** → **clock-time**.
 — the same helper as `fire.still_limited`, so they cannot diverge. Gated by
 `poll_enabled` + `poll_interval_min` + `State.last_poll` in `daemon.tick`.
 
-## UI — terminal menu (`cloophole/menu.py`)
-`menu.run()` is the interface (ADR-0006): a clear-screen status header (daemon up?,
-phase, countdown, live session, work dir, queue, poll) + numbered actions (fire now,
-set queue note, report limit, toggle poll, pin/clear dir, clear, refresh, stop daemon,
-quit). Blocking `input()` loop; quitting leaves the daemon running. Stdlib only — no
-web, no tray. (`ui.py` and `app.py` were removed.)
+## UI — desktop window (`cloophole/gui.py`)
+`gui.run()` is the interface (ADR-0007): a Tkinter window showing live status (phase in
+plain language, countdown, watcher up?, Claude open now, resume-where) with a note
+field, an auto-detect checkbox, and buttons (Resume now, Enter limit time, Choose
+folder, Reset status, Stop watching, Close). Auto-refreshes every 1 s from `state.json`;
+`fire` runs on a worker thread so the window stays responsive. Stdlib `tkinter` only.
+Closing the window leaves the watcher running. (`menu.py`, `ui.py`, `app.py` removed.)
 
-## App lifecycle (`cloophole/runner.py`, `daemon.py`, `menu.py`)
+## App lifecycle (`cloophole/runner.py`, `daemon.py`, `gui.py`)
 - **Background watcher** = a detached, hidden, single-instance daemon process running
   `daemon.run` (claims `daemon.pid`, runs `daemon.loop`).
-- **`open`**: `runner.launch()` (spawn `pythonw -m cloophole daemon` / frozen exe
-  `daemon`, detached + no window) if not running, then `menu.run()`.
-- **`menu`**: just `menu.run()`. **`close`**: `runner.stop()` (taskkill pid tree).
-- **`uninstall`**: `runner.stop()` + remove `~/.cloophole` + legacy autostart cleanup;
-  exe build also drops PATH + deletes its install dir.
-- **Single instance:** `daemon.run` exits if a live process already holds `daemon.pid`
-  (`winproc.pid_alive`). No run-at-logon.
+- **GUI window** = a separate detached process (`_gui` → `gui.run`), single-instance via
+  `gui.pid`.
+- **`open`**: `runner.launch()` (watcher) if not running, then `runner.launch_gui()`
+  (spawn `pythonw -m cloophole _gui` / frozen exe `_gui`, detached + no window).
+- **`close`**: `runner.stop_gui()` + `runner.stop()` (taskkill pid trees).
+- **`uninstall`**: stop both + remove `~/.cloophole` + legacy autostart cleanup; exe
+  build also drops PATH + deletes its install dir.
+- **Single instance:** `daemon.run` exits if `daemon.pid` is live; `gui.run` exits if
+  `gui.pid` is live (`winproc.pid_alive`). No run-at-logon.
 - `cloophole/install_win.py` is **legacy** — autostart cleanup for old installs only.
 
 ## Filesystem (`cloophole/paths.py`)

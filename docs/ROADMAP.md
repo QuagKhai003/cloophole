@@ -39,14 +39,17 @@
 | A3 | ~~tray app~~ → replaced by terminal menu (Phase C) | ↩ |
 | A4 | CLI `open`/`close`/`uninstall`; drop run-at-logon | ✅ |
 
-## Phase C — Terminal menu UI — COMPLETE (ADR-0006)
-**Goal:** interactive terminal menu; no web, no tray, zero deps.
+## Phase C — Terminal menu UI — SUPERSEDED by ADR-0007
+Built (ADR-0006), then replaced by the desktop window. `menu.py` removed.
+
+## Phase D — Desktop GUI window — COMPLETE (ADR-0007)
+**Goal:** a dedicated native window (Tkinter), not web/tray/terminal; stay light.
 
 | # | Task | Status |
 |---|------|--------|
-| C1 | `menu.py` status header + numbered actions | ✅ |
-| C2 | remove `ui.py`/`app.py`, pystray/Pillow, `ui_*` config | ✅ |
-| C3 | `open`/`menu`/`close`; `runner.launch` → background daemon | ✅ |
+| D1 | `runner` GUI support: `gui.pid`, launch/stop, single-instance | ✅ |
+| D2 | `gui.py` Tkinter window: live status + all actions | ✅ |
+| D3 | `open` → watcher + GUI; internal `_gui`; drop menu; spec +tkinter | ✅ |
 
 ## Phase 5 (partial) — Windows autostart — SUPERSEDED by ADR-0003
 | # | Task | Status |

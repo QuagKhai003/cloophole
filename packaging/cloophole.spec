@@ -9,8 +9,8 @@
 # dataclasses, datetime, pathlib, typing, os, re, subprocess, sys, time,
 # threading, shutil, signal, webbrowser(no), http(no).
 EXCLUDES = [
-    # rejected/replaced features
-    "numpy", "pytest", "_pytest", "pystray", "PIL", "tkinter", "turtle",
+    # rejected/replaced features (tkinter IS used by the GUI - not excluded)
+    "numpy", "pytest", "_pytest", "pystray", "PIL", "turtle",
     # unused stdlib subsystems
     "http", "xml", "xmlrpc", "html", "email", "asyncio", "sqlite3", "curses",
     "ftplib", "smtplib", "poplib", "imaplib", "telnetlib", "socketserver",
