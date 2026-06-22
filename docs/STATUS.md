@@ -22,8 +22,8 @@ full open→attach→close lifecycle verified live.
 **NEXT:** cross-platform tray/detection, or PyInstaller `.exe`, or Phase 6 polish.
 
 ## Next action (whoever picks this up)
-- **Before the `irm` one-liner works:** set `OWNER/REPO` in `install.ps1`,
-  `uninstall.ps1`, README; push to GitHub; release one `v*` tag (CI builds the exe).
+- **Before the `irm` one-liner works:** repo set to `QuagKhai003/cloophole` in
+  scripts/README — now just push to GitHub and cut one `v*` tag (CI builds the exe).
 - Cross-platform: mac/Linux process detection + tray + cwd (`/proc`), new ADR.
 - Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
 

@@ -32,7 +32,7 @@ required.
 In PowerShell — no admin, no Python, no pip:
 
 ```powershell
-irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/install.ps1 | iex
 ```
 
 That downloads a standalone `cloophole.exe` into `%LOCALAPPDATA%\Programs\cloophole`
@@ -48,11 +48,11 @@ Run `cloophole open` again anytime to re-attach (never a second copy).
 
 - **Stop it:** tray **Quit**, or `cloophole close`.
 - **Uninstall:** `cloophole uninstall` (stops + removes everything), or
-  `irm https://raw.githubusercontent.com/OWNER/REPO/main/uninstall.ps1 | iex`.
+  `irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 | iex`.
 - **Dashboard:** http://127.0.0.1:8787 (also in the tray menu) — optional.
 
-> Replace `OWNER/REPO` with your GitHub repo. The one-liner pulls the exe from that
-> repo's latest release — see **Building / releasing** below.
+> The one-liner pulls `cloophole.exe` from this repo's latest GitHub Release — push
+> the repo and cut one `v*` tag first (see **Building / releasing** below).
 
 ## Run from source (developers)
 
@@ -128,9 +128,8 @@ multi-directory `--continue` fire (hidden), idle quota poll, **system-tray app**
 (`open`/`close`, single-instance, native toast on fire, tray menu + dashboard), full
 CLI, tests.
 
-Not yet: macOS/Linux tray + detection, a single-file `.exe` bundle (PyInstaller), a
-hook to auto-capture the limit message and last prompt, version-tolerant limit-text
-patterns.
+Not yet: macOS/Linux tray + detection, a hook to auto-capture the limit message and
+last prompt, version-tolerant limit-text patterns.
 
 ## Tests
 

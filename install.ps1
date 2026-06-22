@@ -1,5 +1,5 @@
 # cloophole installer — run with:
-#   irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/install.ps1 | iex
 #
 # Downloads the standalone cloophole.exe (no Python/pip needed) into
 # %LOCALAPPDATA%\Programs\cloophole and adds it to your user PATH.
@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 # --- which repo to pull the release from ------------------------------------
 # Override by setting $env:CLOOPHOLE_OWNER / $env:CLOOPHOLE_REPO before running.
-$Owner = if ($env:CLOOPHOLE_OWNER) { $env:CLOOPHOLE_OWNER } else { "OWNER" }
+$Owner = if ($env:CLOOPHOLE_OWNER) { $env:CLOOPHOLE_OWNER } else { "QuagKhai003" }
 $Repo  = if ($env:CLOOPHOLE_REPO)  { $env:CLOOPHOLE_REPO }  else { "cloophole" }
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\cloophole"

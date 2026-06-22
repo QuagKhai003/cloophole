@@ -1,5 +1,5 @@
 # cloophole uninstaller — run with:
-#   irm https://raw.githubusercontent.com/OWNER/REPO/main/uninstall.ps1 | iex
+#   irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 | iex
 #
 # Stops the app, removes the exe + PATH entry + app data.
 
