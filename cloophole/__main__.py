@@ -253,17 +253,31 @@ def _self_remove_exe() -> None:
         print("removed from PATH.")
     except Exception:
         pass
-    # schedule deletion of the install dir after this process exits
+    # Schedule deletion after this process exits. A running .exe can't delete
+    # itself, so a detached shell waits, then retries rmdir up to 10x (the exe
+    # file stays briefly locked after exit). cwd is forced to %TEMP% so it isn't
+    # sitting inside the folder it's trying to remove.
+    tmp = os.environ.get("TEMP", "C:\\Windows\\Temp")
+    # %i (single) because this runs via `cmd /c`, not a .bat file.
+    bat = (
+        'ping 127.0.0.1 -n 3 >nul'
+        ' & for /l %i in (1,1,10) do ('
+        '   rmdir /s /q "{d}" 2>nul'
+        '   & if not exist "{d}" exit'
+        '   & ping 127.0.0.1 -n 2 >nul'
+        ' )'
+    ).format(d=install_dir)
     try:
         subprocess.Popen(
-            ["cmd", "/c", "timeout /t 2 >nul & rmdir /s /q \"%s\"" % install_dir],
+            ["cmd", "/c", bat],
+            cwd=tmp,
             creationflags=0x00000008 | 0x08000000,  # DETACHED | NO_WINDOW
             close_fds=True,
         )
         print(f"removing {install_dir} ...")
     except Exception:
         print(f"note: delete {install_dir} manually.")
-    print("done.")
+    print("done. (Open a NEW terminal - this one still has the old PATH.)")
 
 
 COMMANDS = {
