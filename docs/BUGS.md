@@ -35,6 +35,13 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B7 — `cloophole open` shows no window (detached GUI child crashes)**
+  (user-reported 2026-06-22). `runner._spawn` launched the `_gui` child with
+  `DETACHED_PROCESS` but no stdio redirection. A detached process has no console, so
+  its inherited stdout/stderr are invalid; the GUI wrote `gui.pid` then died on Tk's
+  first write — leaving a stale pid and no window. (Daemon survived: it doesn't write
+  to stdout early.) **Fix:** `_spawn` redirects stdin/stdout/stderr to `DEVNULL`.
+  RESOLVED 2026-06-22 (`cloophole/runner.py`).
 - **B4 — blank "claude" console window on fire** (user-reported 2026-06-22).
   Console-less `pythonw` spawning `claude.exe` made Windows allocate a blank console
   titled "claude". **Fix:** `subproc.run` applies `CREATE_NO_WINDOW` to all claude.exe

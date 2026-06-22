@@ -3,16 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (dedicated desktop window — Tkinter, ADR-0007; replaced terminal menu)
+**Last updated:** 2026-06-22 (B7 fix — detached GUI showed no window; stdio→DEVNULL)
 
 ## Active task
-**Phase D — desktop GUI window (ADR-0007) — DONE (branch `feat/gui-window`).**
-Replaced the terminal menu with `gui.py` (Tkinter window: live status, note field,
-auto-detect checkbox, buttons for resume/limit/folder/reset/stop). `runner` gained
-`gui.pid` + `is_gui_running`/`launch_gui`/`stop_gui`; `open` now starts the watcher +
-spawns the GUI detached (single-instance); removed `menu.py`/`menu` cmd; spec
-re-includes tkinter. Exe ~11 MB pre-UPX. 27 tests; verified window from source + exe.
-**Pending:** merge `feat/gui-window` → main.
+**B7 fix — `cloophole open` showed no window — DONE (branch `fix/detached-gui-stdio`).**
+The detached `_gui` child was spawned with `DETACHED_PROCESS` but no stdio
+redirection; with no console its inherited stdout/stderr were invalid, so the GUI
+wrote `gui.pid` then crashed on Tk's first write — stale pid, no window. Fix:
+`runner._spawn` now sends stdin/stdout/stderr to `DEVNULL`. Verified live from source
+(window survives) + regression test. 28 tests.
+(Phase D desktop GUI window, ADR-0007, was already merged to main.)
 
 ## Phase
 Done on Windows: 1–4 (engine/gating/poll), A (app lifecycle), B (distribution: exe +
@@ -24,6 +24,14 @@ on by default. 27 tests green, all on per-feature branches.
 - Cross-platform: mac/Linux process detection + cwd (`/proc`) + GUI check, new ADR.
 - Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
 - Optional: onedir build (faster startup, no `_MEI` temp) if size allows.
+
+## Verify before trusting (live, this machine)
+- After a fresh install, **rebuild needed**: the released exe predates B7 — CI rebuilds
+  on push to main; reinstall via `irm .../install.ps1 | iex` to get the windowed fix.
+- `cloophole open` → window must appear. Start a real `claude` session → window's
+  "Claude open now" should flip to **yes** and show its folder (proves `winproc` PEB).
+- 27→28 offline tests cover logic only; the live fire path still needs a manual smoke
+  (`fire-now`) — see B2/B6.
 
 ## Watch / before launch
 - `winproc.py` PEB offsets are **64-bit only** (BUGS B1).
