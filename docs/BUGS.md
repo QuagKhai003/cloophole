@@ -35,6 +35,15 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B18 — `open`-spawned GUI showed no sessions (foreground did)** (user-reported
+  2026-06-23). `cloophole status`/CLI detected the folders and `state.live_dirs` held
+  them, but the spawned window showed none, while a foreground `_gui` showed them. The
+  GUI depended on the daemon writing `live_dirs` AND its 1s refresh loop staying alive;
+  a spawned GUI that rendered before the daemon's first write, then hit one refresh
+  error, stayed stuck on the empty read. **Fix:** the GUI now detects sessions itself on
+  a background thread (`daemon.detect_sessions`, OS inspection — Golden-Rule-fine),
+  independent of daemon timing, and `refresh()` always reschedules in a `finally` so one
+  bad tick can't freeze it. RESOLVED 2026-06-23 (`cloophole/gui.py`).
 - **B17 — "Resume ticked sessions" fired nothing** (user-reported 2026-06-23). The GUI
   button computed targets from `state.live_dirs` (the raw daemon value, momentarily
   empty between ticks) instead of the **sticky list the user sees and ticks**, so it
