@@ -64,8 +64,8 @@ def run() -> None:
     root = tk.Tk()
     root.title("cloophole")
     root.configure(bg=BG)
-    root.geometry("440x430")
-    root.minsize(420, 420)
+    root.geometry("440x600")  # tall enough for all rows; clamped to content below
+    root.minsize(440, 560)
 
     def lbl(parent, text, color=FG, font=("Segoe UI", 10), **kw):
         return tk.Label(parent, text=text, bg=kw.pop("bg", BG), fg=color, font=font, **kw)
@@ -210,6 +210,11 @@ def run() -> None:
             pass
 
     root.protocol("WM_DELETE_WINDOW", lambda: (_cleanup(), root.destroy()))
+    # Fit the window to its actual content so no button is clipped (DPI/font safe).
+    root.update_idletasks()
+    fit_w, fit_h = max(440, root.winfo_reqwidth()), root.winfo_reqheight()
+    root.geometry(f"{fit_w}x{fit_h}")
+    root.minsize(fit_w, fit_h)
     refresh()
     import gc
     gc.collect()  # drop import/build garbage before the window goes idle

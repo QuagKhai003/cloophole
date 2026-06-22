@@ -62,9 +62,9 @@ def test_gui_helpers():
     assert gui._countdown(state.State()) == "-"
 
 
-def test_spawn_detaches_stdio(env, monkeypatch):
-    """Detached children must get DEVNULL stdio, else the GUI child crashes on
-    its first write with no console (no window appears). Regression for that bug."""
+def test_spawn_silences_stdio(env, monkeypatch):
+    """Windowless children must get DEVNULL stdio, else the GUI child crashes on
+    its first write with no console (no window appears). Regression for B7."""
     runner, _ = env
     import subprocess
     captured = {}
@@ -74,6 +74,24 @@ def test_spawn_detaches_stdio(env, monkeypatch):
     assert captured["stdin"] == subprocess.DEVNULL
     assert captured["stdout"] == subprocess.DEVNULL
     assert captured["stderr"] == subprocess.DEVNULL
+
+
+def test_spawn_no_visible_console(env, monkeypatch):
+    """CREATE_NO_WINDOW must NOT be combined with DETACHED_PROCESS (0x8): Win32
+    ignores no-window when detached, leaving a blank console window. Regression."""
+    import sys
+    if sys.platform != "win32":
+        import pytest
+        pytest.skip("Windows-only spawn flags")
+    runner, _ = env
+    captured = {}
+    monkeypatch.setattr(runner.subprocess, "Popen",
+                        lambda *a, **k: captured.update(k))
+    runner._spawn("_gui")
+    flags = captured["creationflags"]
+    assert flags & 0x08000000          # CREATE_NO_WINDOW set
+    assert not (flags & 0x00000008)    # DETACHED_PROCESS NOT set
+    assert captured["startupinfo"].wShowWindow == 0  # SW_HIDE
 
 
 def test_gui_launch_skips_when_running(env, monkeypatch):

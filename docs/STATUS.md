@@ -3,16 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (B7 fix — detached GUI showed no window; stdio→DEVNULL)
+**Last updated:** 2026-06-22 (B8 fix — blank console window + clipped GUI buttons)
 
 ## Active task
-**B7 fix — `cloophole open` showed no window — DONE (branch `fix/detached-gui-stdio`).**
-The detached `_gui` child was spawned with `DETACHED_PROCESS` but no stdio
-redirection; with no console its inherited stdout/stderr were invalid, so the GUI
-wrote `gui.pid` then crashed on Tk's first write — stale pid, no window. Fix:
-`runner._spawn` now sends stdin/stdout/stderr to `DEVNULL`. Verified live from source
-(window survives) + regression test. 28 tests.
-(Phase D desktop GUI window, ADR-0007, was already merged to main.)
+**B8 fix — blank console behind GUI + clipped buttons — DONE (branch
+`fix/gui-window-console-and-size`).** `_spawn` combined `DETACHED_PROCESS |
+CREATE_NO_WINDOW`; Win32 ignores no-window when detached, so the console exe showed a
+blank terminal (surfaced once B7 let the GUI live). Fix: CREATE_NO_WINDOW alone +
+SW_HIDE. Also the 440x430 window clipped its 6 buttons → now clamps to
+`winfo_reqheight`. 29 tests; window verified live from source.
+(Prior: B7 — no window at all — fixed via stdio→DEVNULL. Phase D GUI already on main.)
 
 ## Phase
 Done on Windows: 1–4 (engine/gating/poll), A (app lifecycle), B (distribution: exe +
