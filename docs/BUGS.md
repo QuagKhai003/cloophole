@@ -35,6 +35,15 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B13 — GUI: session list flickered; status card had a big empty gap**
+  (user-reported 2026-06-23). (a) A transient `claude.exe` PEB-read miss made
+  `live_dirs` blink empty between ticks, so the GUI tore down + rebuilt the list →
+  flicker. **Fix:** the daemon keeps the last good `live_dirs` on an empty read while a
+  session is still live (only clears when nothing is live), and the GUI rebuilds rows
+  only when the *sorted set* of folders changes (order jitter ignored). (b) The 26pt
+  countdown label reserved its line height even when empty, leaving a tall gap. **Fix:**
+  pack it only when there's a reset to count down to. RESOLVED 2026-06-23
+  (`cloophole/daemon.py`, `cloophole/gui.py`).
 - **B12 — uninstall/close left orphan cloophole processes** (user-reported 2026-06-23).
   The pid-file stops only kill recorded pids; a stale pid, a second instance, or a GUI
   with a cleared pid file survived. **Fix (ADR-0009):** `runner.kill_all()` sweeps every

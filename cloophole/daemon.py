@@ -130,7 +130,11 @@ def tick(cfg: dict) -> state.State:
     st = state.load()
     live, cwds = detect_sessions(cfg)
     st.live_session = live
-    st.live_dirs = list(cwds)  # for the GUI session list
+    # Keep the last good list on a transient empty read (a PEB cwd read can flake
+    # while Claude is still live) so the GUI list doesn't flicker. Only clear it
+    # when no session is live at all.
+    if cwds or not live:
+        st.live_dirs = list(cwds)
     now = datetime.now(timezone.utc)
 
     # Zero-quota auto-detect: Claude's StopFailure/rate_limit hook dropped a signal.

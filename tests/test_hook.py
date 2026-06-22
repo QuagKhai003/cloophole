@@ -96,6 +96,17 @@ def test_fire_dirs_falls_back_to_hook_dir(env):
     assert daemon._fire_dirs(st, ["C:/live"]) == ["C:/live"]
 
 
+def test_live_dirs_kept_on_transient_empty_read(env, monkeypatch):
+    _, daemon, state, config = env
+    state.save(state.State(phase=state.WATCHING, live_dirs=["C:/a"]))
+    # live but cwd unreadable this tick -> keep the last good list (no GUI flicker)
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (True, []))
+    assert daemon.tick(config.load()).live_dirs == ["C:/a"]
+    # genuinely no live session -> clear it
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    assert daemon.tick(config.load()).live_dirs == []
+
+
 def test_fire_dirs_respects_unticked_sessions(env):
     _, daemon, state, _ = env
     st = state.State(excluded_dirs=["C:/b"])

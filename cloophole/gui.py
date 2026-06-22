@@ -109,10 +109,11 @@ def run() -> None:
     v_dot.pack(side="left", padx=(0, 8))
     v_status = lbl(phase_row, "", FG, ("Segoe UI", 11, "bold"), bg=PANEL)
     v_status.pack(side="left")
+    # big countdown — only shown (packed) when there's a reset to count down to,
+    # otherwise it would leave a tall empty gap in the card.
     v_count = lbl(sc, "", ACCENT, ("Segoe UI", 26, "bold"), bg=PANEL)
-    v_count.pack(anchor="w", padx=16)
     v_meta = lbl(sc, "", SUB, ("Segoe UI", 9), bg=PANEL, justify="left")
-    v_meta.pack(anchor="w", padx=16, pady=(2, 14))
+    v_meta.pack(anchor="w", padx=16, pady=(6, 14))
 
     # ---------- "resume what" ----------
     lbl(root, "WHAT TO RESUME AFTER THE RESET", SUB, ("Segoe UI", 8, "bold")).pack(
@@ -229,7 +230,9 @@ def run() -> None:
 
     def _render_sessions(force: bool = False) -> None:
         st = state.load()
-        dirs = list(st.live_dirs or [])
+        # Sort so process-enumeration order jitter doesn't trigger a rebuild (flicker);
+        # only a real change in the SET of folders rebuilds the rows.
+        dirs = sorted(st.live_dirs or [])
         if not force and dirs == _rendered["dirs"]:
             _update_count()
             return
@@ -346,7 +349,12 @@ def run() -> None:
         running = runner.is_running()
         v_status.config(text=_PHASE_PLAIN.get(st.phase, st.phase))
         v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
-        v_count.config(text=_countdown(st) if st.reset_at else "")
+        if st.reset_at:
+            v_count.config(text=_countdown(st))
+            if not v_count.winfo_ismapped():
+                v_count.pack(anchor="w", padx=16, before=v_meta)
+        elif v_count.winfo_ismapped():
+            v_count.pack_forget()
         where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
         meta = (f"Watcher {'running' if running else 'stopped'}   ·   "
                 f"Claude open now: {'yes' if st.live_session else 'no'}\n"

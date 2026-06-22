@@ -3,9 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0010 — session tick boxes + GUI redesign)
+**Last updated:** 2026-06-23 (B13 — fix GUI session-list flicker + empty status card)
 
 ## Active task
+**B13 fix — GUI flicker + empty card — DONE on `main`, pending CI + user verify.**
+Daemon keeps last good `live_dirs` on a transient empty PEB read (clears only when no
+session is live); GUI rebuilds rows only when the sorted set of folders changes; the
+big countdown label is packed only when there's a reset (kills the empty gap). 43 tests.
+Tick-box selection (ADR-0010) confirmed working in the user's screenshot.
+
+## (prior) Active task
 **Session tick boxes + GUI redesign (ADR-0010) — DONE on `main`, pending CI + user
 verify.** Detection confirmed working (folders read: cloophole, bull-buddy). GUI now
 lists each detected session with a checkbox (default all ticked; `state.excluded_dirs`
