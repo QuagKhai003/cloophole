@@ -35,6 +35,16 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B15 — `cloophole open` killed itself (kill_all tree-killed the bootloader)**
+  (user-reported 2026-06-23). After B14 wired `kill_all` into `open`, no window
+  appeared. A PyInstaller onefile app is two processes — a bootloader (parent) + the
+  real app (child), both `cloophole.exe`. `kill_all` excluded `os.getpid()` (the child)
+  but `taskkill /T`'d the bootloader **parent**, whose tree-kill cascaded back to the
+  child, so `open` died before launching the GUI. **Fix:** `winproc.list_procs` returns
+  `(pid, ppid)`; `kill_all` skips both self **and** its parent (bootloader); other
+  instances are still swept. RESOLVED 2026-06-23 (`cloophole/winproc.py`,
+  `cloophole/runner.py`). (Foreground `_gui` always worked — confirmed the GUI itself
+  was fine.)
 - **B14 — session list still flickered (duplicate/orphan daemons race on state)**
   (user-reported 2026-06-23, after B13). B13's daemon-side smoothing only governs ONE
   daemon. After many upgrade/reinstall cycles, an orphan daemon from an older build kept

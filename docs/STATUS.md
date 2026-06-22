@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B14 — flicker from orphan daemons: clean-restart + list hold)
+**Last updated:** 2026-06-23 (B15 — open killed itself via kill_all; spare the bootloader)
 
 ## Active task
+**B15 fix — `cloophole open` showed no window again — DONE on `main`, pending CI +
+user verify.** B14's `kill_all` in `open` tree-killed the PyInstaller bootloader parent
+(`/T`), cascading to the open process itself before it launched the GUI. Fix:
+`winproc.list_procs` exposes `(pid, ppid)`; `kill_all` skips self AND its bootloader
+parent. Clean-restart on `open` + flicker fixes (B13/B14) now actually take effect.
+44 tests. Foreground `_gui` confirmed the GUI is fine.
+
+## (prior) Active task
 **B14 fix — flicker from duplicate/orphan daemons — DONE on `main`, pending CI +
 user verify.** B13's smoothing only covered one daemon; an orphan from an older build
 kept writing empty `live_dirs`. Fix: `cloophole open` clean-restarts (stop+kill_all

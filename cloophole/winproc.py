@@ -93,6 +93,33 @@ def find_pids(process_name: str) -> list[int]:
     return pids
 
 
+def list_procs(process_name: str) -> list[tuple[int, int]]:
+    """[(pid, parent_pid)] for processes whose exe matches process_name.
+
+    Used to sweep cloophole's own processes safely: a PyInstaller onefile app is a
+    bootloader (parent) + the real app (child), both named the same, so callers must
+    know the parent to avoid tree-killing themselves.
+    """
+    if _k32 is None:
+        return []
+    snap = _k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == wintypes.HANDLE(-1).value or snap == -1:
+        return []
+    out: list[tuple[int, int]] = []
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        ok = _k32.Process32FirstW(snap, ctypes.byref(entry))
+        target = process_name.lower()
+        while ok:
+            if entry.szExeFile.lower() == target:
+                out.append((entry.th32ProcessID, entry.th32ParentProcessID))
+            ok = _k32.Process32NextW(snap, ctypes.byref(entry))
+    finally:
+        _k32.CloseHandle(snap)
+    return out
+
+
 def _read(handle, address: int, size: int) -> Optional[bytes]:
     buf = (ctypes.c_char * size)()
     read = ctypes.c_size_t(0)
