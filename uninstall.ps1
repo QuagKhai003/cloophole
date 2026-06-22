@@ -1,7 +1,7 @@
 # cloophole uninstaller — run with:
 #   irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 | iex
 #
-# Stops the app, removes the exe + PATH entry + app data.
+# Stops EVERYTHING, removes the Claude hook, then deletes the exe + PATH + app data.
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -12,8 +12,20 @@ $DataDir    = Join-Path $env:USERPROFILE ".cloophole"
 Write-Host "cloophole uninstaller" -ForegroundColor Cyan
 
 if (Test-Path $ExePath) {
-    try { & $ExePath close | Out-Null } catch {}
-    Start-Sleep -Milliseconds 500
+    # remove the rate-limit hook from Claude settings + stop watcher/window
+    try { & $ExePath hook off | Out-Null } catch {}
+    try { & $ExePath close   | Out-Null } catch {}
+    Start-Sleep -Milliseconds 400
+}
+
+# Hard sweep: kill any leftover/hanging cloophole process by name (the complaint
+# was orphaned processes surviving uninstall). This shell is not cloophole, so it
+# can kill them all safely.
+$procs = Get-Process cloophole -ErrorAction SilentlyContinue
+if ($procs) {
+    $procs | Stop-Process -Force
+    Write-Host "stopped $($procs.Count) running cloophole process(es)." -ForegroundColor Green
+    Start-Sleep -Milliseconds 300
 }
 
 # remove PATH entry
@@ -26,4 +38,9 @@ if ($userPath -like "*$InstallDir*") {
 
 Remove-Item -Recurse -Force $InstallDir
 Remove-Item -Recurse -Force $DataDir
-Write-Host "removed app + data." -ForegroundColor Green
+if (Test-Path $InstallDir) {
+    Write-Host "note: $InstallDir is still locked; close any cloophole window and re-run." -ForegroundColor Yellow
+} else {
+    Write-Host "removed app + data." -ForegroundColor Green
+}
+Write-Host "done. Open a NEW terminal (this one still has the old PATH)." -ForegroundColor Cyan

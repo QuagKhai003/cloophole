@@ -35,6 +35,14 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B12 — uninstall/close left orphan cloophole processes** (user-reported 2026-06-23).
+  The pid-file stops only kill recorded pids; a stale pid, a second instance, or a GUI
+  with a cleared pid file survived. **Fix (ADR-0009):** `runner.kill_all()` sweeps every
+  `cloophole.exe` by image name (`taskkill /T /F`, excluding self; frozen+Windows only)
+  and clears pid files; wired into `close` and `uninstall`. `uninstall.ps1` also kills
+  `Get-Process cloophole` by name and runs `hook off`. Uninstall now deregisters the
+  rate-limit hook too. RESOLVED 2026-06-23 (`cloophole/runner.py`, `__main__.py`,
+  `uninstall.ps1`).
 - **B9 — idle probe spent quota in the background (design flaw)**
   (user-reported 2026-06-23). With `poll_enabled` on, `daemon.tick` ran a `claude -p`
   probe every `poll_interval_min` while WATCHING — a live call that costs quota even

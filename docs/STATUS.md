@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0008 hook + GUI: session list, bottom-pinned buttons)
+**Last updated:** 2026-06-23 (ADR-0009 clean uninstall — sweep orphans + drop hook)
 
 ## Active task
+**Clean uninstall (ADR-0009) — DONE on `main`, pending CI build + user verify.**
+`runner.kill_all()` sweeps every `cloophole.exe` by name (excl. self, frozen-only),
+wired into `close` + `uninstall`; uninstall also deregisters the rate-limit hook;
+`uninstall.ps1` kills by name + `hook off` + removes PATH/exe/data. 39 tests.
+NEXT: one CI build covers the GUI/hook polish AND this; user verifies window fit +
+session list + hook, then a clean uninstall leaves nothing behind. Then Phase 6.
+
+## (prior) Active task
 **GUI polish + hook (ADR-0008) — DONE on `main`, pending CI build + user verify.**
 Hook auto-detect shipped (poll checkbox gone). GUI now lists detected Claude sessions
 by folder name (`state.live_dirs`, written by the daemon), pins the action buttons to

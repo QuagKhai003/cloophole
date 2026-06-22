@@ -4,7 +4,8 @@
           watcher daemon if it isn't running, then open the app window.
           `close` stops it. No run-at-logon — started explicitly via `open`.
 @done     is_running()/pid()/launch()/stop() for the daemon; is_gui_running()/
-          launch_gui() for the GUI window (both detached + single-instance).
+          launch_gui() for the GUI window (both detached + single-instance);
+          kill_all() sweeps every cloophole.exe by name for a clean close/uninstall.
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
 @limits   Windows-first; launch uses pythonw + CREATE_NO_WINDOW only (NOT
           DETACHED_PROCESS, which un-hides the console; NOT STARTUPINFO SW_HIDE,
@@ -159,6 +160,34 @@ def stop_gui() -> bool:
     except OSError:
         pass
     return True
+
+
+def kill_all(exclude_self: bool = True) -> int:
+    """Force-kill EVERY cloophole process (by exe name), except this one.
+
+    The pid-file stops can miss orphans (a stale pid, a second instance, a GUI
+    whose pid file was cleared). For a clean `close`/`uninstall` we sweep by image
+    name so nothing is left hanging. Returns how many processes were signalled.
+    Frozen (.exe) + Windows only — from source the processes are python.exe, which
+    we deliberately don't sweep. Always clears the pid files.
+    """
+    n = 0
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        from . import winproc
+        me = os.getpid()
+        name = Path(sys.executable).name  # e.g. cloophole.exe
+        for p in winproc.find_pids(name):
+            if exclude_self and p == me:
+                continue
+            subprocess.run(["taskkill", "/PID", str(p), "/T", "/F"],
+                           capture_output=True, text=True)
+            n += 1
+    for f in (pid_file(), gui_pid_file()):
+        try:
+            f.unlink()
+        except OSError:
+            pass
+    return n
 
 
 def stop() -> bool:

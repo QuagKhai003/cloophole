@@ -117,6 +117,31 @@ def test_spawn_strips_pyinstaller_env(env, monkeypatch):
     assert "PATH" in env_passed  # ordinary vars are preserved
 
 
+def test_kill_all_noop_from_source(env):
+    runner, _ = env
+    # tests aren't frozen -> no process sweep, just returns 0 (and clears pid files)
+    assert runner.kill_all() == 0
+
+
+def test_kill_all_sweeps_others_not_self(env, monkeypatch):
+    runner, _ = env
+    import os
+    import sys
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", r"C:\x\cloophole.exe", raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    me = os.getpid()
+    from cloophole import winproc
+    monkeypatch.setattr(winproc, "find_pids", lambda name: [me, 4242, 4243])
+    killed = []
+    monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: killed.append(a[0]))
+    n = runner.kill_all()
+    assert n == 2  # the two others, not self
+    flat = [" ".join(map(str, cmd)) for cmd in killed]
+    assert not any(str(me) in c for c in flat)
+    assert any("4242" in c for c in flat) and any("4243" in c for c in flat)
+
+
 def test_gui_launch_skips_when_running(env, monkeypatch):
     runner, _ = env
     monkeypatch.setattr(runner, "is_gui_running", lambda: True)

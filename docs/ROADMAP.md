@@ -91,6 +91,15 @@ default (poll stays opt-in). Supersedes ADR-0002 for everyday use.
 | H2 | daemon consumes the signal → WAITING (+ `hook_dir` fallback, B6) | ✅ |
 | H3 | CLI `limit-signal`/`hook`; `open` registers + notice; uninstall removes; GUI drops poll checkbox | ✅ |
 
+## Phase I — Clean uninstall — COMPLETE (ADR-0009)
+**Goal:** no leftover/hanging processes after close/uninstall; remove the hook.
+
+| # | Task | Status |
+|---|------|--------|
+| I1 | `runner.kill_all()` sweep by image name (excl. self, frozen-only) | ✅ |
+| I2 | wire into `close` + `uninstall`; `uninstall` deregisters the hook | ✅ |
+| I3 | `uninstall.ps1` kills by name + `hook off` + PATH/exe/data removal | ✅ |
+
 ## Phase 6 — Polish — PLANNED (ADR-0004)
 | # | Task | Status |
 |---|------|--------|
