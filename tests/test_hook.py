@@ -1,0 +1,86 @@
+"""StopFailure rate-limit hook tests (ADR-0008) — settings I/O + signal consume.
+
+No Claude is ever invoked: install/uninstall touch a temp settings.json, the
+signal is a temp file, and the daemon's detector is stubbed.
+"""
+
+import json
+
+import pytest
+
+
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLOOPHOLE_HOME", str(tmp_path / "cloophole"))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
+    import importlib
+    from cloophole import claude_hook, config, daemon, paths, state
+    for m in (paths, state, config, claude_hook, daemon):
+        importlib.reload(m)
+    return claude_hook, daemon, state, config
+
+
+def test_signal_roundtrip_carries_cwd(env):
+    claude_hook, _, _, _ = env
+    claude_hook.record_signal('{"cwd": "C:/work/proj", "hook_event_name": "StopFailure"}')
+    sig = claude_hook.read_signal()
+    assert sig and sig["cwd"] == "C:/work/proj"
+    assert sig["source"] == "rate_limit"
+    claude_hook.clear_signal()
+    assert claude_hook.read_signal() is None
+
+
+def test_record_signal_never_raises_on_garbage(env):
+    claude_hook, _, _, _ = env
+    claude_hook.record_signal("not json at all")  # must not raise
+    assert claude_hook.read_signal()["cwd"] is None
+
+
+def test_install_is_idempotent_and_removable(env):
+    claude_hook, _, _, _ = env
+    assert not claude_hook.hook_installed()
+    claude_hook.install_hook()
+    claude_hook.install_hook()  # twice -> still one entry
+    assert claude_hook.hook_installed()
+    data = json.loads(claude_hook.settings_path().read_text())
+    entries = data["hooks"]["StopFailure"]
+    ours = [e for e in entries
+            if any("limit-signal" in h.get("command", "") for h in e["hooks"])]
+    assert len(ours) == 1
+    assert ours[0]["matcher"] == "rate_limit"
+    assert claude_hook.uninstall_hook()
+    assert not claude_hook.hook_installed()
+
+
+def test_install_preserves_foreign_hooks(env):
+    claude_hook, _, _, _ = env
+    p = claude_hook.settings_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [
+        {"type": "command", "command": "echo mine"}]}]}}))
+    claude_hook.install_hook()
+    claude_hook.uninstall_hook()
+    data = json.loads(p.read_text())
+    # the user's own Stop hook is untouched
+    assert data["hooks"]["Stop"][0]["hooks"][0]["command"] == "echo mine"
+
+
+def test_daemon_consumes_signal_into_waiting(env, monkeypatch):
+    claude_hook, daemon, state, config = env
+    monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
+    state.save(state.State(phase=state.WATCHING))
+    claude_hook.record_signal('{"cwd": "C:/work/proj"}')
+    cfg = config.load()
+    cfg["limit_window_hours"] = 5
+    out = daemon.tick(cfg)
+    assert out.phase == state.WAITING
+    assert out.hook_dir == "C:/work/proj"
+    assert claude_hook.read_signal() is None  # consumed
+
+
+def test_fire_dirs_falls_back_to_hook_dir(env):
+    _, daemon, state, _ = env
+    st = state.State(work_dir=None, hook_dir="C:/work/proj")
+    assert daemon._fire_dirs(st, []) == ["C:/work/proj"]
+    # a live cwd still wins over the hook fallback
+    assert daemon._fire_dirs(st, ["C:/live"]) == ["C:/live"]

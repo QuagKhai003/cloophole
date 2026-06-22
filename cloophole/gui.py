@@ -18,7 +18,7 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 
-from . import config, fire, state
+from . import fire, state
 from .paths import gui_pid_file
 from .reset_parser import parse_reset
 
@@ -101,18 +101,18 @@ def run() -> None:
     note_entry.bind("<FocusOut>", save_note)
     lbl(root, "(blank = pick up where you left off)", SUB, ("Segoe UI", 8)).pack(anchor="w", padx=18)
 
-    # --- auto-detect toggle ---
-    auto_var = tk.BooleanVar(value=config.get("poll_enabled"))
-
-    def toggle_auto():
-        config.set_("poll_enabled", auto_var.get())
-
-    tk.Checkbutton(root, text="Auto-detect the limit by itself", variable=auto_var,
-                   command=toggle_auto, bg=BG, fg=FG, selectcolor=CARD,
-                   activebackground=BG, activeforeground=FG, font=("Segoe UI", 9)
-                   ).pack(anchor="w", padx=14, pady=(8, 0))
-    lbl(root, "(off by default - this probes Claude on a timer and spends a little "
-              "of your usage)", SUB, ("Segoe UI", 8)).pack(anchor="w", padx=18)
+    # --- auto-detect status (zero-quota Claude hook; no probing) ---
+    from . import claude_hook
+    _hook_on = False
+    try:
+        _hook_on = claude_hook.hook_installed()
+    except Exception:
+        pass
+    lbl(root,
+        ("Auto-detect: ON - Claude tells cloophole the moment you're limited "
+         "(no quota used)." if _hook_on else
+         "Auto-detect: OFF - run `cloophole hook on`, or enter the limit time below."),
+        SUB, ("Segoe UI", 9)).pack(anchor="w", padx=18, pady=(8, 0))
 
     # --- actions ---
     btns = tk.Frame(root, bg=BG)

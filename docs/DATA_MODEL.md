@@ -15,6 +15,7 @@ Persisted as `~/.cloophole/state.json`. The single source of truth for the machi
 | `last_fired` | ISO \| None | last successful fire |
 | `last_error` | str \| None | last fire error |
 | `last_poll` | ISO \| None | last idle probe (gates poll cadence) |
+| `hook_dir` | path \| None | cwd from the rate-limit hook; `_fire_dirs` fallback when no live cwd |
 | `live_session` | bool | last observed gate result |
 | `updated_at` | ISO | set on every `save()` |
 
@@ -47,6 +48,7 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `poll_interval_min` | `30` | gentle — probing still costs quota |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched by the live gate |
+| `limit_window_hours` | `5` | estimated reset window when the rate-limit hook fires |
 
 ## `FireResult` (`cloophole/fire.py`)
 `ok: bool`, `still_limited: bool`, `new_reset_text: str|None`, `stdout`, `stderr`,
@@ -60,7 +62,18 @@ Parse order = most explicit first: **ISO** → **relative** → **clock-time**.
 - clock: `resets at 5:30 PM`, `try again at 17:00`, `resets 5pm` (rolls to tomorrow
   if already past). All results returned as aware UTC.
 
-## Idle probe (`cloophole/probe.py`)
+## Rate-limit hook (`cloophole/claude_hook.py`, ADR-0008)
+Zero-quota auto-detect. A `StopFailure`/`rate_limit` hook in the user's Claude
+`settings.json` runs `cloophole limit-signal` when a turn ends from a usage limit;
+that writes `~/.cloophole/limit-signal.json` = `{ts, cwd, source}`. `daemon.tick`
+reads + clears it and, from WATCHING/ARMED/FIRED/ERROR, arms WAITING with
+`reset_at = now + limit_window_hours` and `hook_dir = cwd`.
+- `settings_path()` honors `$CLAUDE_CONFIG_DIR` (else `~/.claude/settings.json`).
+- `install_hook`/`uninstall_hook` touch only our entry (marked by `limit-signal` in the
+  command); foreign hooks are preserved. `open` installs; `uninstall`/`hook off` remove.
+- The hook gives no reset *time* (transcript-only) — hence the estimate.
+
+## Idle probe (`cloophole/probe.py`) — opt-in (OFF by default, B9)
 `probe(cfg) -> (limited: bool, text: str|None)`. Sends one `claude -p` call via
 `subproc.run` (no console window). `limited` uses `reset_parser.is_limit_message`
 — the same helper as `fire.still_limited`, so they cannot diverge. Gated by

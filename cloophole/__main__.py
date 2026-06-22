@@ -15,7 +15,8 @@
   cloophole queue "<note>"         set what to continue
   cloophole dir <path>             pin one dir (else fire all live sessions)
   cloophole fire-now               fire immediately (ignores gate)
-  cloophole poll on|off            idle quota auto-detection
+  cloophole hook on|off            zero-quota limit auto-detect (Claude hook)
+  cloophole poll on|off            idle quota auto-detection (opt-in; costs quota)
   cloophole arm <when>             manually arm: "5:30 PM" / "in 2h" / ISO
   cloophole clear                  back to WATCHING, drop reset/limit
   cloophole config [key [value]]   show / get / set config
@@ -174,14 +175,48 @@ def cmd_daemon(_args: list[str]) -> int:
 
 def cmd_open(_args: list[str]) -> int:
     """Start the background watcher (if needed) and open the app window."""
-    from . import runner
+    from . import claude_hook, runner
     if not runner.is_running():
         runner.launch()
         print("cloophole watcher started in the background.")
+    # Zero-quota auto-detect: register the rate-limit hook in Claude's settings.
+    try:
+        newly = not claude_hook.hook_installed()
+        claude_hook.install_hook()
+        if newly:
+            print(f"auto-detect on: registered a rate-limit hook in "
+                  f"{claude_hook.settings_path()}")
+            print("  (costs no quota; restart Claude Code to load it; "
+                  "`cloophole hook off` to remove)")
+    except Exception:
+        pass
     if runner.launch_gui():
         print("Opening cloophole...")
     else:
         print("cloophole window is already open.")
+    return 0
+
+
+def cmd_limit_signal(_args: list[str]) -> int:
+    """Internal: invoked by Claude's StopFailure/rate_limit hook. Records the
+    limit (reads the hook's JSON on stdin) so the daemon arms — zero quota."""
+    from . import claude_hook
+    claude_hook.record_signal()
+    return 0
+
+
+def cmd_hook(args: list[str]) -> int:
+    """Register/remove the zero-quota rate-limit auto-detect hook."""
+    from . import claude_hook
+    if args and args[0] == "on":
+        claude_hook.install_hook()
+        print(f"limit auto-detect hook installed -> {claude_hook.settings_path()}")
+        print("  restart Claude Code to load it.")
+    elif args and args[0] == "off":
+        print("removed." if claude_hook.uninstall_hook() else "no cloophole hook found.")
+    else:
+        print(f"limit auto-detect hook is {'ON' if claude_hook.hook_installed() else 'OFF'}")
+        print("usage: cloophole hook on|off")
     return 0
 
 
@@ -211,6 +246,12 @@ def cmd_uninstall(_args: list[str]) -> int:
     runner.stop_gui()
     if runner.stop():
         print("stopped the running app.")
+    try:  # remove our rate-limit hook from Claude's settings
+        from . import claude_hook
+        if claude_hook.uninstall_hook():
+            print("removed the rate-limit hook from Claude settings.")
+    except Exception:
+        pass
     if sys.platform == "win32":  # clear any legacy autostart from older builds
         try:
             from . import install_win
@@ -283,6 +324,8 @@ def _self_remove_exe() -> None:
 COMMANDS = {
     "open": cmd_open,
     "_gui": cmd_gui,
+    "limit-signal": cmd_limit_signal,
+    "hook": cmd_hook,
     "close": cmd_close,
     "status": cmd_status,
     "report": cmd_report,

@@ -47,6 +47,7 @@ class State:
     last_fired: Optional[str] = None
     last_error: Optional[str] = None
     last_poll: Optional[str] = None       # last idle probe (ISO UTC)
+    hook_dir: Optional[str] = None        # cwd from the rate-limit hook (fire fallback)
     live_session: bool = False            # last observed
     updated_at: str = field(default_factory=_now_iso)
 

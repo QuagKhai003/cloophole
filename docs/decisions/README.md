@@ -15,3 +15,4 @@ Copy `0000-template.md` → `NNNN-<slug>.md` and link it below.
 | 0005 | Standalone .exe + one-line PowerShell installer | Accepted — COMPLETE |
 | 0006 | Terminal menu UI (drop web dashboard + tray) | Superseded by 0007 |
 | 0007 | Dedicated desktop window (Tkinter) | Accepted — COMPLETE |
+| 0008 | Zero-quota limit auto-detect via Claude `StopFailure` hook | Accepted — COMPLETE (supersedes 0002 as default) |
