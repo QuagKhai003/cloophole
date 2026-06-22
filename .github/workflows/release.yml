@@ -31,9 +31,17 @@ jobs:
           python -m pip install . pyinstaller pytest
           python -m pytest -q
 
+      - name: Install UPX (exe compression)
+        run: choco install upx -y --no-progress
+
       - name: Build cloophole.exe
         working-directory: packaging
         run: python -m PyInstaller cloophole.spec --noconfirm
+
+      - name: Report size
+        run: |
+          $s = (Get-Item packaging/dist/cloophole.exe).Length / 1MB
+          Write-Host ("cloophole.exe = {0:N1} MB" -f $s)
 
       - name: Smoke-test the exe
         run: packaging/dist/cloophole.exe status
