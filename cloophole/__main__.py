@@ -231,7 +231,9 @@ def cmd_close(_args: list[str]) -> int:
     """Stop the background watcher (and close the window)."""
     from . import runner
     runner.stop_gui()
-    if runner.stop():
+    stopped = runner.stop()
+    swept = runner.kill_all()  # catch orphans the pid-file stops missed
+    if stopped or swept:
         print("cloophole stopped.")
     else:
         print("cloophole was not running.")
@@ -246,6 +248,9 @@ def cmd_uninstall(_args: list[str]) -> int:
     runner.stop_gui()
     if runner.stop():
         print("stopped the running app.")
+    swept = runner.kill_all()  # sweep any leftover/orphan cloophole processes
+    if swept:
+        print(f"stopped {swept} leftover cloophole process(es).")
     try:  # remove our rate-limit hook from Claude's settings
         from . import claude_hook
         if claude_hook.uninstall_hook():
