@@ -62,6 +62,20 @@ def test_gui_helpers():
     assert gui._countdown(state.State()) == "-"
 
 
+def test_spawn_detaches_stdio(env, monkeypatch):
+    """Detached children must get DEVNULL stdio, else the GUI child crashes on
+    its first write with no console (no window appears). Regression for that bug."""
+    runner, _ = env
+    import subprocess
+    captured = {}
+    monkeypatch.setattr(runner.subprocess, "Popen",
+                        lambda *a, **k: captured.update(k))
+    runner._spawn("_gui")
+    assert captured["stdin"] == subprocess.DEVNULL
+    assert captured["stdout"] == subprocess.DEVNULL
+    assert captured["stderr"] == subprocess.DEVNULL
+
+
 def test_gui_launch_skips_when_running(env, monkeypatch):
     runner, _ = env
     monkeypatch.setattr(runner, "is_gui_running", lambda: True)

@@ -6,7 +6,8 @@
 @done     is_running()/pid()/launch()/stop() for the daemon; is_gui_running()/
           launch_gui() for the GUI window (both detached + single-instance).
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
-@limits   Windows-first; launch uses pythonw + DETACHED_PROCESS|CREATE_NO_WINDOW.
+@limits   Windows-first; launch uses pythonw + DETACHED_PROCESS|CREATE_NO_WINDOW,
+          with stdio -> DEVNULL so the detached GUI child has valid handles.
 @affects  Used by CLI open/close/uninstall. Process holds daemon.pid.
 """
 
@@ -74,7 +75,14 @@ def _cmd(sub: str) -> list[str]:
 
 
 def _spawn(sub: str) -> None:
-    kwargs = {}
+    # Detach std handles too: with DETACHED_PROCESS the child has no console, so
+    # inherited stdout/stderr are invalid and the first write (e.g. Tk startup in
+    # the `_gui` child) crashes it. DEVNULL gives it valid, silent handles.
+    kwargs = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
     if sys.platform == "win32":
         kwargs["creationflags"] = DETACHED
     subprocess.Popen(_cmd(sub), close_fds=True, **kwargs)
