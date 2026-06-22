@@ -22,3 +22,6 @@ packaging/dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# local-only Claude Code slash commands (untracked)
+.claude/commands/phase-resume.md
