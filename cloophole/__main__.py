@@ -1,16 +1,15 @@
-"""cloophole CLI — terminal menu + background watcher control.
+"""cloophole CLI — desktop app window + background watcher control.
 
-@context  The human entry point. `open` starts the background daemon and opens
-          the terminal menu; the rest report limits, queue work, inspect state.
-@done     open/menu/close/status/report/arm/queue/dir/clear/fire-now/poll/config/
-          daemon/uninstall; main() arg dispatch.
+@context  The human entry point. `open` starts the background watcher and opens
+          the app window (GUI); the rest report limits, queue work, inspect state.
+@done     open/close/status/report/arm/queue/dir/clear/fire-now/poll/config/
+          daemon/uninstall + internal _gui; main() arg dispatch.
 @todo     —
-@limits   open/close/uninstall are Windows-first.
-@affects  Reads/writes state + config; calls runner, menu, daemon, fire.
+@limits   open/close/uninstall are Windows-first; GUI needs a display.
+@affects  Reads/writes state + config; calls runner, gui, daemon, fire.
 
-  cloophole open                   start the daemon + open the terminal menu
-  cloophole menu                   open the terminal menu
-  cloophole close                  stop the background daemon
+  cloophole open                   start the watcher + open the app window
+  cloophole close                  stop the watcher + close the window
   cloophole status                 show state + countdown
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
   cloophole queue "<note>"         set what to continue
@@ -174,25 +173,29 @@ def cmd_daemon(_args: list[str]) -> int:
 
 
 def cmd_open(_args: list[str]) -> int:
-    """Ensure the background daemon is running, then open the terminal menu."""
-    from . import menu, runner
+    """Start the background watcher (if needed) and open the app window."""
+    from . import runner
     if not runner.is_running():
         runner.launch()
-        print("cloophole daemon started in the background.")
-    menu.run()
+        print("cloophole watcher started in the background.")
+    if runner.launch_gui():
+        print("Opening cloophole...")
+    else:
+        print("cloophole window is already open.")
     return 0
 
 
-def cmd_menu(_args: list[str]) -> int:
-    """Open the terminal menu (does not auto-start the daemon)."""
-    from . import menu
-    menu.run()
+def cmd_gui(_args: list[str]) -> int:
+    """Internal: run the GUI window (spawned detached by `open`)."""
+    from . import gui
+    gui.run()
     return 0
 
 
 def cmd_close(_args: list[str]) -> int:
-    """Stop the background daemon."""
+    """Stop the background watcher (and close the window)."""
     from . import runner
+    runner.stop_gui()
     if runner.stop():
         print("cloophole stopped.")
     else:
@@ -205,6 +208,7 @@ def cmd_uninstall(_args: list[str]) -> int:
     import shutil
     from . import runner
     from .paths import home
+    runner.stop_gui()
     if runner.stop():
         print("stopped the running app.")
     if sys.platform == "win32":  # clear any legacy autostart from older builds
@@ -264,7 +268,7 @@ def _self_remove_exe() -> None:
 
 COMMANDS = {
     "open": cmd_open,
-    "menu": cmd_menu,
+    "_gui": cmd_gui,
     "close": cmd_close,
     "status": cmd_status,
     "report": cmd_report,

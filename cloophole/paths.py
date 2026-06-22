@@ -2,8 +2,8 @@
 
 @context  Single place that resolves the ~/.cloophole/ home and the files inside
           it, so durable state lives on disk and the CLI/daemon/UI agree.
-@done     home(), state_file(), config_file(), log_file(), pid_file();
-          $CLOOPHOLE_HOME override for test isolation.
+@done     home(), state_file(), config_file(), log_file(), pid_file(),
+          gui_pid_file(); $CLOOPHOLE_HOME override for test isolation.
 @todo     —
 @limits   PURE-ish: only path resolution + mkdir of the home dir.
 @affects  Imported by config, state, daemon, ui. Honors $CLOOPHOLE_HOME.
@@ -36,3 +36,7 @@ def log_file() -> Path:
 
 def pid_file() -> Path:
     return home() / "daemon.pid"
+
+
+def gui_pid_file() -> Path:
+    return home() / "gui.pid"
