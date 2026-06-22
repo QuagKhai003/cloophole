@@ -27,21 +27,22 @@ reopen the menu.
 
 ## Using it
 
-The menu shows live status and lets you act:
+The menu shows plain-language status and lets you act:
 
 ```
-  [1] Fire now            resume right now
-  [2] Set queue note      what it should continue
-  [3] Report limit text   paste "resets at 5:30 PM" (only if you want to set it manually)
-  [4] Toggle auto-watch   auto-detect the limit (ON by default)
-  [5] Pin / clear dir     fire in one dir (default: all live sessions)
-  [s] Stop daemon         [q] Quit menu (watcher keeps running)
+  [1] Resume now          continue your Claude work right now
+  [2] Set what to resume  a note telling it what to continue
+  [3] Enter limit time    if you know when it resets (e.g. 5:30 PM)
+  [4] Auto-detect (on)    let it find the limit on its own
+  [5] Choose folder       resume in one project (default: all)
+  [6] Reset status        clear the limit and start watching again
+  [s] Stop & quit         [q] Close menu (keeps watching)
 ```
 
-**Auto-watch is on by default:** the watcher quietly probes for the limit every ~30
-min and arms itself when it appears — you don't need to paste anything. (Each probe
-costs a tiny bit of quota; turn it off with `[4]` or `cloophole poll off` if you'd
-rather report limits manually.)
+**Auto-detect is on by default:** the watcher quietly checks for the limit every ~30
+min and sets itself up when it appears — you don't need to enter anything. (Each check
+costs a tiny bit of quota; turn it off with `[4]` if you'd rather enter limits
+yourself.)
 
 Same actions exist as commands, e.g. `cloophole report "resets at 5:30 PM"`,
 `cloophole queue "finish the refactor"`, `cloophole status`.
