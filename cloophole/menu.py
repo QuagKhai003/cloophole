@@ -46,7 +46,8 @@ def _header(st: state.State, running: bool) -> None:
     print(f"  live session  {'yes' if st.live_session else 'no'}")
     print(f"  work dir      {st.work_dir or '(all live sessions)'}")
     print(f"  queued        {st.queue_note or '(fallback)'}")
-    print(f"  idle poll     {'on' if config.get('poll_enabled') else 'off'}")
+    print(f"  auto-watch    {'on' if config.get('poll_enabled') else 'off'}"
+          f"  (every {config.get('poll_interval_min')}m)")
     if st.last_error:
         print(f"  last error    {st.last_error}")
     print("-" * 44)
@@ -56,7 +57,7 @@ def _actions() -> None:
     print("  [1] Fire now")
     print("  [2] Set queue note")
     print("  [3] Report limit text  (arm a reset time)")
-    print("  [4] Toggle idle poll")
+    print("  [4] Toggle auto-watch (auto-detect the limit)")
     print("  [5] Pin / clear work dir")
     print("  [6] Clear (back to WATCHING)")
     print("  [r] Refresh    [s] Stop daemon    [q] Quit menu")

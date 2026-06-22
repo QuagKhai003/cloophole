@@ -3,7 +3,7 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (terminal-menu UI — ADR-0006; dropped web dashboard + tray)
+**Last updated:** 2026-06-22 (auto-watch on by default — no manual report needed)
 
 ## Phase
 Phases 1–4 + **A (app lifecycle)** + **B (distribution)** + **C (terminal menu UI,
