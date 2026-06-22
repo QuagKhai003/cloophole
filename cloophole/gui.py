@@ -219,22 +219,23 @@ def run() -> None:
         state.save(st)
         _update_count()
 
-    # _shown = the dirs currently drawn; _hold counts consecutive empty reads so a
-    # transient blank (or a stray old daemon writing []) doesn't tear the list down.
-    _rendered = {"dirs": None, "shown": [], "hold": 0}
-    _EMPTY_HOLD = 8  # ~8s of refreshes before we believe the list is really empty
+    # Per-folder stickiness: each detected folder lingers for _STICKY refreshes after
+    # it stops being seen, so one missed PEB read (the daemon re-detects every ~15s and
+    # a folder read can flake for a tick) can't blink a session in and out. A folder
+    # that genuinely closes disappears after _STICKY seconds.
+    _rendered = {"dirs": None}
+    _seen: dict[str, int] = {}
+    _ticks = {"n": 0}
+    _STICKY = 22  # refreshes (~22s) — must exceed daemon_tick_sec (15) plus headroom
 
     def _effective_dirs() -> list:
-        dirs = sorted(state.load().live_dirs or [])
-        if dirs:
-            _rendered["shown"] = dirs
-            _rendered["hold"] = 0
-            return dirs
-        _rendered["hold"] += 1
-        if _rendered["shown"] and _rendered["hold"] < _EMPTY_HOLD:
-            return _rendered["shown"]  # keep the last good list briefly
-        _rendered["shown"] = []
-        return []
+        _ticks["n"] += 1
+        now = _ticks["n"]
+        for d in state.load().live_dirs or []:
+            _seen[d] = now
+        for d in [d for d, t in _seen.items() if now - t > _STICKY]:
+            del _seen[d]
+        return sorted(_seen)
 
     def _update_count():
         dirs = _rendered["dirs"] or []
