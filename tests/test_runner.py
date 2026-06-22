@@ -153,7 +153,7 @@ def test_kill_all_noop_from_source(env):
     assert runner.kill_all() == 0
 
 
-def test_kill_all_sweeps_others_not_self(env, monkeypatch):
+def test_kill_all_spares_self_and_bootloader(env, monkeypatch):
     runner, _ = env
     import os
     import sys
@@ -161,14 +161,18 @@ def test_kill_all_sweeps_others_not_self(env, monkeypatch):
     monkeypatch.setattr(sys, "executable", r"C:\x\cloophole.exe", raising=False)
     monkeypatch.setattr(sys, "platform", "win32")
     me = os.getpid()
+    boot = 999001  # our PyInstaller bootloader (parent) — must NOT be killed
     from cloophole import winproc
-    monkeypatch.setattr(winproc, "find_pids", lambda name: [me, 4242, 4243])
+    # (pid, ppid): self (child of boot), the bootloader, and two other instances
+    monkeypatch.setattr(winproc, "list_procs",
+                        lambda name: [(me, boot), (boot, 5), (4242, 9), (4243, 9)])
     killed = []
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: killed.append(a[0]))
     n = runner.kill_all()
-    assert n == 2  # the two others, not self
+    assert n == 2  # only the two unrelated instances
     flat = [" ".join(map(str, cmd)) for cmd in killed]
-    assert not any(str(me) in c for c in flat)
+    assert not any(str(me) in c for c in flat)      # never ourselves
+    assert not any(str(boot) in c for c in flat)    # never our bootloader (B15)
     assert any("4242" in c for c in flat) and any("4243" in c for c in flat)
 
 

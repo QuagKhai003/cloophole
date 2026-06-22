@@ -176,8 +176,14 @@ def kill_all(exclude_self: bool = True) -> int:
         from . import winproc
         me = os.getpid()
         name = Path(sys.executable).name  # e.g. cloophole.exe
-        for p in winproc.find_pids(name):
-            if exclude_self and p == me:
+        procs = winproc.list_procs(name)
+        my_ppid = next((pp for p, pp in procs if p == me), None)
+        # Skip ourselves AND our PyInstaller bootloader parent: a /T (tree) kill of
+        # the bootloader cascades down and kills us too (B15). Other instances'
+        # bootloaders are fair game and take their app children down with them.
+        skip = {me, my_ppid} if exclude_self else set()
+        for p, _pp in procs:
+            if p in skip:
                 continue
             subprocess.run(["taskkill", "/PID", str(p), "/T", "/F"],
                            capture_output=True, text=True)
