@@ -29,11 +29,20 @@
 |---|------|--------|
 | 4.1 | stdlib status page + `/state` JSON | ✅ |
 
-## Phase 5 (partial) — Windows installer — COMPLETE (ADR-0001, hardened post-feedback)
+## Phase A — Desktop tray app — COMPLETE (ADR-0003)
+**Goal:** feel like an installed app — tray icon, no terminal/browser needed.
+
 | # | Task | Status |
 |---|------|--------|
-| 5.1 | Task Scheduler run-at-logon install/uninstall | ✅ |
-| 5.1a | Startup-shim install (no admin) as default + start/stop + no-window fire | ✅ |
+| A1 | extract `daemon.loop(cfg, stop)` from `run()` | ✅ |
+| A2 | `runner.py` launch/attach/stop (`open`/`close`) | ✅ |
+| A3 | `app.py` tray: menu, dynamic icon/title, toast, queue dialog | ✅ |
+| A4 | CLI `open`/`close`/`uninstall`; drop run-at-logon | ✅ |
+
+## Phase 5 (partial) — Windows autostart — SUPERSEDED by ADR-0003
+| # | Task | Status |
+|---|------|--------|
+| 5.1 | Task Scheduler / Startup-shim run-at-logon | ⛔ removed (no autostart; `open` starts it). Cleanup kept in `install_win.py` for old installs. |
 
 ## Phase 3 — Idle poll — COMPLETE (ADR-0002)
 **Goal:** auto-detect the limited→available transition while you're away.
@@ -44,12 +53,12 @@
 | 3.2 | `State.last_poll`; arm from probe in `daemon.tick` | ✅ |
 | 3.3 | wire `poll_enabled`/`poll_interval_min` + `poll on\|off` CLI | ✅ |
 
-## Phase 5 (rest) — Cross-platform — PLANNED (ADR-0003)
+## Phase 5 (rest) — Cross-platform — PLANNED (ADR-0004+)
 | # | Task | Status |
 |---|------|--------|
-| 5.2 | macOS detection (`launchd`) + cwd | ⬜ |
-| 5.3 | Linux detection (`systemd --user`) + cwd via `/proc` | ⬜ |
-| 5.4 | `install.py` / `uninstall.py` platform dispatch | ⬜ |
+| 5.2 | macOS detection + tray + cwd | ⬜ |
+| 5.3 | Linux detection + tray + cwd via `/proc` | ⬜ |
+| 5.4 | single-file `.exe` bundle (PyInstaller) | ⬜ |
 
 ## Phase 6 — Polish — PLANNED (ADR-0004)
 | # | Task | Status |

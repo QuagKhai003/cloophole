@@ -24,31 +24,37 @@ recent conversation there.
 
 State machine: `WATCHING → WAITING → (ARMED) → FIRING → WATCHING`.
 
+It runs as a small **system-tray app** — no terminal to keep open, no browser
+required.
+
 ## Requirements
 
 - Windows 10/11, Python 3.10+ (tested on 3.14)
 - `claude` CLI on PATH
-- Zero third-party Python dependencies
+- Deps: `pystray`, `Pillow` (tray icon). Installed automatically by `pip install`.
 
-## Install
+## Install & run
 
-Two commands. **No administrator rights needed.**
+**No administrator rights needed.**
 
 ```powershell
-pip install -e .
-cloophole install
+pip install -e .     # installs the `cloophole` command + deps
+cloophole open       # launches the tray app
 ```
 
-That's it — `install` registers a hidden run-at-logon shim (user Startup folder)
-**and** starts the daemon right now. The daemon serves a live status page at
-**http://127.0.0.1:8787** — run `cloophole open` to pop it in your browser. It's
-idempotent: re-run `install` any time to restart with the latest code. Remove
-everything with `cloophole uninstall`.
+`cloophole open` starts the app in the background and a **tray icon appears near the
+clock** — right-click it for the menu (dashboard, fire now, idle poll, queue note,
+quit). It keeps running even if you close the terminal. Run `cloophole open` again
+anytime from any folder to re-attach to the running app (it never starts a second
+copy).
 
-Prefer a Task Scheduler task instead of the Startup shim? `cloophole install --task`
-(that one may prompt for an elevated terminal).
+- **Stop it:** the tray **Quit** item, or `cloophole close` in any terminal.
+- **Uninstall:** `cloophole uninstall` (stops everything + removes app data), then
+  `pip uninstall cloophole`.
+- **Dashboard:** the app serves http://127.0.0.1:8787 (also "Open dashboard" in the
+  tray menu) — optional, the tray is enough.
 
-Run the watcher in the foreground without installing:
+Run the watcher headless (no tray) instead:
 
 ```powershell
 python -m cloophole daemon
@@ -57,6 +63,8 @@ python -m cloophole daemon
 ## Usage
 
 ```powershell
+cloophole open                         # launch the tray app (or attach if running)
+cloophole close                        # stop the background app
 cloophole status                       # phase + countdown + live-session
 cloophole report "resets at 5:30 PM"   # parse limit text, arm -> WAITING
 cloophole queue  "finish auth refactor"# what to continue (else: fallback)
@@ -66,10 +74,9 @@ cloophole fire-now                     # fire immediately, ignoring the gate
 cloophole arm    "in 2h"               # arm manually (clock / relative / ISO)
 cloophole clear                        # back to WATCHING
 cloophole config [key [value]]         # show / get / set tunables
-cloophole open                         # open the status page in your browser
-cloophole ui [port]                    # serve the page in the foreground
-cloophole start | stop                 # start/stop the background daemon
-cloophole uninstall                    # remove shim/task + stop the daemon
+cloophole ui [port]                    # serve the dashboard in the foreground
+cloophole daemon                       # run the watcher headless (no tray)
+cloophole uninstall                    # stop everything + remove app data
 ```
 
 By default a fire runs `--continue` in **every** live `claude` session's directory.
@@ -96,11 +103,13 @@ State, config, and logs live in `~/.cloophole/` (override with `$CLOOPHOLE_HOME`
 ## Status of this build
 
 Done: engine + state machine, reset parser, Windows process/cwd detection,
-multi-directory `--continue` fire (hidden window), idle quota poll, full CLI, local
-UI, no-admin Startup-shim installer (+ `start`/`stop`, single-instance daemon), tests.
+multi-directory `--continue` fire (hidden), idle quota poll, **system-tray app**
+(`open`/`close`, single-instance, native toast on fire, tray menu + dashboard), full
+CLI, tests.
 
-Not yet: macOS/Linux detection + installers, a hook to auto-capture the limit message
-and last prompt, version-tolerant limit-text patterns.
+Not yet: macOS/Linux tray + detection, a single-file `.exe` bundle (PyInstaller), a
+hook to auto-capture the limit message and last prompt, version-tolerant limit-text
+patterns.
 
 ## Tests
 

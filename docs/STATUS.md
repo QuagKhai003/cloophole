@@ -3,26 +3,27 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (daemon serves UI + `open`; one-command no-admin install; single-instance; multi-dir fire)
+**Last updated:** 2026-06-22 (desktop tray app — ADR-0003; `open`/`close`; no run-at-logon)
 
 ## Phase
-Phases 1, 2, 3, 4, and 5.1 (Windows) are **COMPLETE**. Engine, gating, idle poll, UI,
-and the Windows installer all work; verified against the real `claude.exe`. 17 tests
-green. Next planned work is **Phase 5 (rest) — cross-platform** (ADR-0003) or Phase 6.
+Phases 1–4 + **Phase A (desktop tray app, ADR-0003)** are **COMPLETE** on Windows.
+Run-at-logon was removed (superseded by `cloophole open`). 26 tests green. Next:
+cross-platform (mac/Linux tray + detection) or a `.exe` bundle, then Phase 6 polish.
 
 ## Active task
-**Phase 3 idle poll (ADR-0002) — DONE + user-feedback fixes — DONE.**
-Added `probe.py` (no-window `claude -p` probe), shared `reset_parser.is_limit_message`
-(reused by `fire`), `State.last_poll`, the WATCHING poll branch in `daemon.tick`, and
-`cloophole poll on|off`. Reworked `install_win.py`: **Startup-shim default (no admin)**,
-Task Scheduler opt-in (`install --task`), `start`/`stop`, and `subproc.run`
-(`CREATE_NO_WINDOW`) so firing no longer pops a blank "claude" window. 17 tests green.
-**NEXT:** ADR-0003 cross-platform (mac/Linux) OR Phase 6 polish.
+**Phase A — desktop tray app (ADR-0003) — DONE.**
+New `app.py` (pystray tray: menu, dynamic icon/title, toast on fire, tkinter queue
+dialog) + `runner.py` (`open`=launch-or-attach, `close`=stop). `daemon` refactored to
+`claim_pid`/`loop`/`start_ui` so the tray runs the watcher in a thread. CLI reworked to
+`open`/`close`/`uninstall` (+ internal `_app`); logon `install`/`start`/`stop` removed;
+`install_win.py` demoted to legacy cleanup. Deps added: pystray, Pillow. 26 tests green;
+full open→attach→close lifecycle verified live.
+**NEXT:** cross-platform tray/detection, or PyInstaller `.exe`, or Phase 6 polish.
 
 ## Next action (whoever picks this up)
-- **User must re-cut their install** (see "Watch" below) to drop the old admin task.
-- Next feature work: ADR-0003 (mac launchd / Linux systemd-user + `/proc` cwd) per
-  ROADMAP 5.2–5.4; or Phase 6 polish (version-tolerant patterns, log rotation).
+- Cross-platform: mac/Linux process detection + tray + cwd (`/proc`), new ADR.
+- Or package a single-file `.exe` (PyInstaller) so users don't need Python.
+- Or Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
 
 ## Watch / before launch
 - **Migrating the user's existing install:** just re-run `cloophole install` (no admin).

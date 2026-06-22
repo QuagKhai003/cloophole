@@ -10,5 +10,5 @@ Copy `0000-template.md` → `NNNN-<slug>.md` and link it below.
 |---|-------|--------|
 | 0001 | Windows-first engine, gating, UI, installer | Accepted — COMPLETE |
 | 0002 | Idle quota poll | Accepted — COMPLETE |
-| 0003 | Cross-platform (macOS / Linux) | Planned |
+| 0003 | Desktop tray app (no terminal/browser/logon) | Accepted — COMPLETE |
 | 0004 | Polish: version-tolerant patterns, logging, hot-reload | Planned |

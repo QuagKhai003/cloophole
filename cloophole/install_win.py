@@ -1,15 +1,14 @@
-"""Windows run-at-logon install/uninstall (product plan §8, §11).
+"""LEGACY — Windows run-at-logon autostart (superseded by ADR-0003).
 
-@context  Make the daemon start at logon and run hidden, with NO admin rights
-          by default. Task Scheduler (the old default) needed elevation on some
-          machines ("access is denied"), so the shim path is now the default.
-@done     install() is idempotent + no-admin: stops old daemon, drops a leftover
-          task best-effort, writes a Startup .vbs shim, starts detached. method=
-          "task" uses schtasks. start_now/stop are pid-aware (liveness-checked).
-@todo     mac launchd / Linux systemd-user + install.py dispatch (P5, ADR-0003).
-@limits   Windows-only. Shim runs only for the current user at logon.
-@affects  Invoked by CLI install/uninstall/start/stop. Runs
-          `pythonw -m cloophole daemon` hidden.
+@context  Older builds registered a Startup-shim / Task Scheduler autostart.
+          ADR-0003 dropped run-at-logon (the app starts explicitly via
+          `cloophole open`). Kept only so `cloophole uninstall` can clean up
+          autostart entries left by those older installs.
+@done     _uninstall_shim()/_uninstall_task() cleanup helpers (called by
+          uninstall). Other functions retained but no longer wired to the CLI.
+@todo     remove entirely once no old installs remain.
+@limits   Windows-only. Not part of the current install flow.
+@affects  Called by CLI uninstall for legacy cleanup only.
 """
 
 from __future__ import annotations

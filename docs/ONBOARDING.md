@@ -18,6 +18,9 @@ way — it's the contract everyone follows.
   pattern ⇒ new test, including garbage-returns-None.
 - **Windows internals** → `cloophole/winproc.py` (ctypes PEB), `install_win.py`.
   PEB offsets are 64-bit; see BUGS B1.
+- **Tray app / lifecycle** → `cloophole/app.py` (pystray), `runner.py` (open/close),
+  `daemon.py` (`claim_pid`/`loop`). GUI deps (pystray/Pillow) are lazy — keep them out
+  of the other modules.
 - **CLI / UI** → `cloophole/__main__.py`, `ui.py`. Read-only views onto the state file.
 
 ## Your first task

@@ -173,31 +173,61 @@ def _already_running() -> bool:
     return old != __import__("os").getpid() and winproc.pid_alive(old)
 
 
-def run() -> None:
-    cfg = config.load()
+def claim_pid() -> bool:
+    """Take the single-instance pid file. False if another daemon already holds it."""
     if _already_running():
+        return False
+    pid_file().write_text(str(__import__("os").getpid()), encoding="utf-8")
+    return True
+
+
+def release_pid() -> None:
+    try:
+        pid_file().unlink()
+    except OSError:
+        pass
+
+
+def loop(cfg: dict, stop: "object | None" = None) -> None:
+    """Run ticks until `stop` (a threading.Event) is set, or forever.
+
+    Shared by the foreground `run()` and the tray app's background thread. Does
+    NOT manage the pid file — the caller owns that (so the tray icon can outlive
+    a single loop and the guard stays authoritative).
+    """
+    import threading
+    stop = stop or threading.Event()
+    interval = cfg["daemon_tick_sec"]
+    while not stop.is_set():
+        try:
+            tick(cfg)
+        except Exception as e:  # keep the loop alive
+            log(f"tick error: {e!r}")
+        stop.wait(interval)
+
+
+def start_ui(cfg: dict) -> None:
+    if not cfg.get("ui_enabled", True):
+        return
+    try:
+        from . import ui
+        ui.start_background(cfg["ui_port"])
+        log(f"UI at http://127.0.0.1:{cfg['ui_port']}")
+    except OSError as e:
+        log(f"UI not started ({e}); set a free ui_port or ui_enabled=false")
+
+
+def run() -> None:
+    """Foreground daemon (headless; `cloophole daemon`)."""
+    cfg = config.load()
+    if not claim_pid():
         log("another daemon is already running; exiting")
         return
-    pid_file().write_text(str(__import__("os").getpid()), encoding="utf-8")
     log(f"daemon start pid={__import__('os').getpid()} tick={cfg['daemon_tick_sec']}s")
-    if cfg.get("ui_enabled", True):
-        try:
-            from . import ui
-            ui.start_background(cfg["ui_port"])
-            log(f"UI at http://127.0.0.1:{cfg['ui_port']}")
-        except OSError as e:
-            log(f"UI not started ({e}); set a free ui_port or ui_enabled=false")
+    start_ui(cfg)
     try:
-        while True:
-            try:
-                tick(cfg)
-            except Exception as e:  # keep the loop alive
-                log(f"tick error: {e!r}")
-            time.sleep(cfg["daemon_tick_sec"])
+        loop(cfg)
     except KeyboardInterrupt:
         log("daemon stop (KeyboardInterrupt)")
     finally:
-        try:
-            pid_file().unlink()
-        except OSError:
-            pass
+        release_pid()

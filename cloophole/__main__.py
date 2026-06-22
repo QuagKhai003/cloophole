@@ -1,30 +1,27 @@
-"""cloophole CLI — manual control surface over the state file (plan §6).
+"""cloophole CLI — control surface for the tray app + state file.
 
-@context  The human entry point: report limits, queue work, inspect state, run
-          the daemon/UI, install. Thin dispatch over the other modules.
-@done     status/report/arm/queue/dir/clear/fire-now/poll/config/daemon/ui/open/
-          install/uninstall/start/stop; main() arg dispatch.
+@context  The human entry point. `open`/`close` run the background tray app;
+          the rest report limits, queue work, and inspect state on disk.
+@done     open/close/status/report/arm/queue/dir/clear/fire-now/poll/config/
+          daemon/ui/uninstall + internal _app; main() arg dispatch.
 @todo     —
-@limits   install/uninstall are Windows-only in this build.
-@affects  Reads/writes state + config; calls daemon.run, ui.serve, fire.fire,
-          install_win. Commands listed below.
+@limits   open/close/uninstall are Windows-first (tray via pystray/Pillow).
+@affects  Reads/writes state + config; calls runner, app, daemon, ui, fire.
 
+  cloophole open                   launch the tray app (or attach if running)
+  cloophole close                  stop the background app
   cloophole status                 show state + countdown
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
   cloophole queue "<note>"         set what to continue
-  cloophole dir <path>             set work directory for --continue
+  cloophole dir <path>             pin one dir (else fire all live sessions)
   cloophole fire-now               fire immediately (ignores gate)
   cloophole poll on|off            idle quota auto-detection
   cloophole arm <when>             manually arm: "5:30 PM" / "in 2h" / ISO
   cloophole clear                  back to WATCHING, drop reset/limit
   cloophole config [key [value]]   show / get / set config
-  cloophole daemon                 run the watcher loop (foreground)
-  cloophole open                   open the status page in your browser
-  cloophole ui [port]              serve the status page in the foreground
-  cloophole install [--task]       run-at-logon: Startup shim (no admin) or
-                                   Task Scheduler (--task); also starts it now
-  cloophole uninstall              remove shim + task, stop the daemon
-  cloophole start | stop           start/stop the background daemon now
+  cloophole ui [port]              serve the dashboard in the foreground
+  cloophole daemon                 run the watcher headless (no tray)
+  cloophole uninstall              stop everything + remove app data
 """
 
 from __future__ import annotations
@@ -183,47 +180,62 @@ def cmd_ui(args: list[str]) -> int:
 
 
 def cmd_open(_args: list[str]) -> int:
-    import webbrowser
-    url = f"http://127.0.0.1:{config.get('ui_port')}"
-    print(f"opening {url}")
-    webbrowser.open(url)
+    """Launch the tray app, or attach to the one already running."""
+    from . import runner
+    if runner.is_running():
+        print("cloophole is already running - see the tray icon (right-click for menu).")
+        cmd_status([])
+        return 0
+    runner.launch()
+    print("cloophole started in the background.")
+    print("Look for the tray icon near the clock - right-click it for the menu.")
+    print(f"Dashboard: http://127.0.0.1:{config.get('ui_port')}")
     return 0
 
 
-def cmd_install(args: list[str]) -> int:
-    if sys.platform != "win32":
-        print("install is Windows-only in this build")
-        return 1
-    from . import install_win
-    method = "task" if "--task" in args else "shim"
-    return install_win.install(method)
+def cmd_close(_args: list[str]) -> int:
+    """Stop the background app."""
+    from . import runner
+    if runner.stop():
+        print("cloophole stopped.")
+    else:
+        print("cloophole was not running.")
+    return 0
 
 
 def cmd_uninstall(_args: list[str]) -> int:
-    if sys.platform != "win32":
-        print("uninstall is Windows-only in this build")
-        return 1
-    from . import install_win
-    return install_win.uninstall()
+    """Stop everything, then remove app data (and legacy autostart entries)."""
+    import shutil
+    from . import runner
+    from .paths import home
+    if runner.stop():
+        print("stopped the running app.")
+    if sys.platform == "win32":  # clear any legacy autostart from older builds
+        try:
+            from . import install_win
+            install_win._uninstall_shim()
+            install_win._uninstall_task(quiet=True)
+        except Exception:
+            pass
+    try:
+        shutil.rmtree(home())
+        print(f"removed app data ({home()}).")
+    except OSError as e:
+        print(f"note: could not remove app data: {e}")
+    print("done. To remove the package itself:  pip uninstall cloophole")
+    return 0
 
 
-def cmd_start(_args: list[str]) -> int:
-    if sys.platform != "win32":
-        print("start is Windows-only in this build")
-        return 1
-    from . import install_win
-    return install_win.start_now()
-
-
-def cmd_stop(_args: list[str]) -> int:
-    if sys.platform != "win32":
-        print("stop is Windows-only in this build")
-        return 1
-    from . import install_win
-    return install_win.stop()
+def cmd_app(_args: list[str]) -> int:
+    """Internal: run the tray app in the foreground (launched detached by `open`)."""
+    from . import app
+    app.run()
+    return 0
 
 
 COMMANDS = {
+    "open": cmd_open,
+    "close": cmd_close,
     "status": cmd_status,
     "report": cmd_report,
     "arm": cmd_arm,
@@ -235,11 +247,8 @@ COMMANDS = {
     "config": cmd_config,
     "daemon": cmd_daemon,
     "ui": cmd_ui,
-    "open": cmd_open,
-    "install": cmd_install,
     "uninstall": cmd_uninstall,
-    "start": cmd_start,
-    "stop": cmd_stop,
+    "_app": cmd_app,  # internal entry point for the detached tray process
 }
 
 

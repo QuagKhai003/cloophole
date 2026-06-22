@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Auto-resume Claude Code work when your usage quota resets (Windows-first daemon)."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "pystray>=0.19",
+    "pillow>=9",
+]
 
 [project.scripts]
 cloophole = "cloophole.__main__:main"

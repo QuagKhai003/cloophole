@@ -74,16 +74,20 @@ The daemon serves the status page itself: `daemon.run` calls `ui.start_backgroun
 without a separate process. `cloophole open` launches a browser; `cloophole ui` runs it
 in the foreground. `start_background(0)` binds a free port (used in tests).
 
-## Install methods (`cloophole/install_win.py`)
-- **shim** (default, no admin): `.vbs` in the user Startup folder, runs the daemon
-  hidden at logon. `cloophole install`.
-- **task** (opt-in): Task Scheduler ONLOGON. `cloophole install --task` (may need an
-  elevated terminal).
-- `install` is idempotent + no-admin: stops the old daemon, best-effort drops a
-  leftover task, writes the shim, and `start_now()` (detached + hidden) — no reboot.
-- `start` / `stop` manage the daemon via `daemon.pid` (liveness-checked).
-- **Single instance:** `daemon.run` exits if a live daemon already holds `daemon.pid`
-  (`winproc.pid_alive`), so duplicate launchers (leftover task + shim) can't double-fire.
+## App lifecycle (`cloophole/app.py`, `runner.py`, `daemon.py`)
+- **Tray app** = one background process: `app.TrayApp.run()` claims `daemon.pid`, starts
+  the UI server + `daemon.loop` on daemon threads, then runs the pystray icon on the
+  main thread. Menu: Open dashboard / Fire now / Idle poll toggle / Set queue note
+  (tkinter) / Quit. A refresh thread recolors the icon, updates the title (phase +
+  countdown), and toasts on entering FIRING.
+- **`open`** (`runner.launch`): if `runner.is_running()` (pid + `winproc.pid_alive`),
+  attach (do nothing); else spawn `pythonw -m cloophole _app` detached + hidden.
+- **`close`** (`runner.stop`): taskkill the pid tree; clears the pid file.
+- **`uninstall`**: `runner.stop()` + remove `~/.cloophole` + best-effort clear legacy
+  autostart (`install_win._uninstall_shim/_task`).
+- **Single instance:** both `app.run` and `daemon.run` exit if a live process already
+  holds `daemon.pid`. No run-at-logon (ADR-0003).
+- `cloophole/install_win.py` is **legacy** — autostart cleanup for old installs only.
 
 ## Filesystem (`cloophole/paths.py`)
 `~/.cloophole/` (or `$CLOOPHOLE_HOME`): `state.json`, `config.json`,
