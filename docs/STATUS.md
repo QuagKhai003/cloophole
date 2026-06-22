@@ -3,12 +3,13 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (desktop tray app — ADR-0003; `open`/`close`; no run-at-logon)
+**Last updated:** 2026-06-22 (standalone .exe + `irm|iex` installer — ADR-0005)
 
 ## Phase
-Phases 1–4 + **Phase A (desktop tray app, ADR-0003)** are **COMPLETE** on Windows.
-Run-at-logon was removed (superseded by `cloophole open`). 26 tests green. Next:
-cross-platform (mac/Linux tray + detection) or a `.exe` bundle, then Phase 6 polish.
+Phases 1–4 + **A (tray app, ADR-0003)** + **B (distribution, ADR-0005)** are
+**COMPLETE** on Windows. Install is now one PowerShell line (`irm …/install.ps1 | iex`,
+no Python/pip) → `cloophole open`. 26 tests green. Next: cross-platform (mac/Linux),
+then Phase 6 polish.
 
 ## Active task
 **Phase A — desktop tray app (ADR-0003) — DONE.**
@@ -21,9 +22,10 @@ full open→attach→close lifecycle verified live.
 **NEXT:** cross-platform tray/detection, or PyInstaller `.exe`, or Phase 6 polish.
 
 ## Next action (whoever picks this up)
+- **Before the `irm` one-liner works:** set `OWNER/REPO` in `install.ps1`,
+  `uninstall.ps1`, README; push to GitHub; release one `v*` tag (CI builds the exe).
 - Cross-platform: mac/Linux process detection + tray + cwd (`/proc`), new ADR.
-- Or package a single-file `.exe` (PyInstaller) so users don't need Python.
-- Or Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
+- Phase 6 polish (version-tolerant limit patterns, log rotation, config hot-reload).
 
 ## Watch / before launch
 - **Migrating the user's existing install:** just re-run `cloophole install` (no admin).

@@ -1,0 +1,51 @@
+name: release
+
+# Tag a version to build the standalone exe and publish it as a release asset,
+# which install.ps1 downloads via .../releases/latest/download/cloophole.exe
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pyinstaller
+
+      - name: Run tests
+        run: |
+          python -m pip install pytest
+          python -m pytest -q
+
+      - name: Build cloophole.exe
+        working-directory: packaging
+        run: python -m PyInstaller cloophole.spec --noconfirm
+
+      - name: Smoke-test the exe
+        run: packaging/dist/cloophole.exe status
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/dist/cloophole.exe
+          generate_release_notes: true
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloophole-exe
+          path: packaging/dist/cloophole.exe

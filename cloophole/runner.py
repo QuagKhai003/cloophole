@@ -47,6 +47,14 @@ def _pythonw() -> str:
     return str(cand if cand.exists() else exe)
 
 
+def _app_command() -> list[str]:
+    """Command that launches the tray app. As a frozen exe, relaunch ourselves;
+    from source, use pythonw -m cloophole."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "_app"]
+    return [_pythonw(), "-m", "cloophole", "_app"]
+
+
 def launch() -> bool:
     """Start the tray app detached + hidden. Returns False if already running."""
     if is_running():
@@ -54,8 +62,7 @@ def launch() -> bool:
     kwargs = {}
     if sys.platform == "win32":
         kwargs["creationflags"] = DETACHED
-    subprocess.Popen([_pythonw(), "-m", "cloophole", "_app"],
-                     close_fds=True, **kwargs)
+    subprocess.Popen(_app_command(), close_fds=True, **kwargs)
     return True
 
 

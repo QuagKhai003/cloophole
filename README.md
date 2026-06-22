@@ -27,37 +27,58 @@ State machine: `WATCHING → WAITING → (ARMED) → FIRING → WATCHING`.
 It runs as a small **system-tray app** — no terminal to keep open, no browser
 required.
 
-## Requirements
+## Install (one line)
 
-- Windows 10/11, Python 3.10+ (tested on 3.14)
-- `claude` CLI on PATH
-- Deps: `pystray`, `Pillow` (tray icon). Installed automatically by `pip install`.
-
-## Install & run
-
-**No administrator rights needed.**
+In PowerShell — no admin, no Python, no pip:
 
 ```powershell
-pip install -e .     # installs the `cloophole` command + deps
-cloophole open       # launches the tray app
+irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
 ```
 
-`cloophole open` starts the app in the background and a **tray icon appears near the
-clock** — right-click it for the menu (dashboard, fire now, idle poll, queue note,
-quit). It keeps running even if you close the terminal. Run `cloophole open` again
-anytime from any folder to re-attach to the running app (it never starts a second
-copy).
-
-- **Stop it:** the tray **Quit** item, or `cloophole close` in any terminal.
-- **Uninstall:** `cloophole uninstall` (stops everything + removes app data), then
-  `pip uninstall cloophole`.
-- **Dashboard:** the app serves http://127.0.0.1:8787 (also "Open dashboard" in the
-  tray menu) — optional, the tray is enough.
-
-Run the watcher headless (no tray) instead:
+That downloads a standalone `cloophole.exe` into `%LOCALAPPDATA%\Programs\cloophole`
+and adds it to your PATH. Then:
 
 ```powershell
-python -m cloophole daemon
+cloophole open
+```
+
+A **tray icon appears near the clock** — right-click for the menu (dashboard, fire
+now, idle poll, queue note, quit). It keeps running even if you close the terminal.
+Run `cloophole open` again anytime to re-attach (never a second copy).
+
+- **Stop it:** tray **Quit**, or `cloophole close`.
+- **Uninstall:** `cloophole uninstall` (stops + removes everything), or
+  `irm https://raw.githubusercontent.com/OWNER/REPO/main/uninstall.ps1 | iex`.
+- **Dashboard:** http://127.0.0.1:8787 (also in the tray menu) — optional.
+
+> Replace `OWNER/REPO` with your GitHub repo. The one-liner pulls the exe from that
+> repo's latest release — see **Building / releasing** below.
+
+## Run from source (developers)
+
+```powershell
+pip install -e .            # installs the `cloophole` command + deps
+cloophole open              # tray app
+python -m cloophole daemon  # or headless, no tray
+```
+
+Requirements for source: Windows 10/11, Python 3.10+, `claude` CLI on PATH. Runtime
+deps `pystray` + `Pillow` install automatically.
+
+## Building / releasing
+
+The standalone exe is built by PyInstaller and shipped via GitHub Releases:
+
+```powershell
+pip install pyinstaller
+cd packaging; python -m PyInstaller cloophole.spec --noconfirm   # -> dist/cloophole.exe
+```
+
+Or just push a tag — `.github/workflows/release.yml` builds `cloophole.exe` and
+attaches it to the release, which `install.ps1` downloads:
+
+```powershell
+git tag v0.1.0 && git push --tags
 ```
 
 ## Usage

@@ -8,6 +8,10 @@ dist/
 .pytest_cache/
 .mypy_cache/
 
+# PyInstaller build output
+packaging/build/
+packaging/dist/
+
 # cloophole runtime state / test sandboxes
 .cloophole/
 .cloophole_smoke/

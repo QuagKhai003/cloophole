@@ -58,7 +58,16 @@
 |---|------|--------|
 | 5.2 | macOS detection + tray + cwd | ⬜ |
 | 5.3 | Linux detection + tray + cwd via `/proc` | ⬜ |
-| 5.4 | single-file `.exe` bundle (PyInstaller) | ⬜ |
+| 5.4 | single-file `.exe` bundle (PyInstaller) | ✅ (ADR-0005) |
+
+## Phase B — Distribution — COMPLETE (ADR-0005)
+**Goal:** one-line install, no Python/pip.
+
+| # | Task | Status |
+|---|------|--------|
+| B1 | PyInstaller onefile `cloophole.exe` | ✅ |
+| B2 | `install.ps1`/`uninstall.ps1` (irm \| iex) + PATH + frozen-aware launch | ✅ |
+| B3 | release CI builds + attaches the exe on tag | ✅ |
 
 ## Phase 6 — Polish — PLANNED (ADR-0004)
 | # | Task | Status |

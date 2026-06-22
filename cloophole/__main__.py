@@ -222,8 +222,47 @@ def cmd_uninstall(_args: list[str]) -> int:
         print(f"removed app data ({home()}).")
     except OSError as e:
         print(f"note: could not remove app data: {e}")
-    print("done. To remove the package itself:  pip uninstall cloophole")
+
+    if getattr(sys, "frozen", False):
+        _self_remove_exe()
+    else:
+        print("done. To remove the package itself:  pip uninstall cloophole")
     return 0
+
+
+def _self_remove_exe() -> None:
+    """Frozen (.exe) uninstall: drop the PATH entry and delete the install dir.
+
+    The running exe can't delete itself, so a detached shell removes the folder
+    a moment after we exit."""
+    import os
+    import subprocess
+    install_dir = os.path.dirname(sys.executable)
+    # remove our dir from the user PATH
+    try:
+        ps = (
+            "$d='%s';"
+            "$p=[Environment]::GetEnvironmentVariable('Path','User');"
+            "if($p -like \"*$d*\"){"
+            "$n=($p.Split(';')|?{$_ -and $_ -ne $d}) -join ';';"
+            "[Environment]::SetEnvironmentVariable('Path',$n,'User')}"
+        ) % install_dir
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                       capture_output=True, text=True)
+        print("removed from PATH.")
+    except Exception:
+        pass
+    # schedule deletion of the install dir after this process exits
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "timeout /t 2 >nul & rmdir /s /q \"%s\"" % install_dir],
+            creationflags=0x00000008 | 0x08000000,  # DETACHED | NO_WINDOW
+            close_fds=True,
+        )
+        print(f"removing {install_dir} ...")
+    except Exception:
+        print(f"note: delete {install_dir} manually.")
+    print("done.")
 
 
 def cmd_app(_args: list[str]) -> int:
