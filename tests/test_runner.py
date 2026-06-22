@@ -86,6 +86,25 @@ def test_cmd_sessions_none(monkeypatch, capsys):
     assert "no live Claude session" in capsys.readouterr().out
 
 
+def test_fire_visible_launches_continue_window(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLOOPHOLE_HOME", str(tmp_path))
+    import importlib
+    import sys
+    from cloophole import config, fire
+    importlib.reload(config)
+    importlib.reload(fire)
+    captured = {}
+    monkeypatch.setattr(fire.subprocess, "Popen",
+                        lambda args, **k: captured.update(args=args, kw=k))
+    err = fire.fire_visible("C:/proj", "do the thing")
+    assert err is None
+    assert captured["args"][:2] == [config.get("claude_path"), "--continue"]
+    assert "do the thing" in " ".join(captured["args"])  # note passed as guidance
+    assert captured["kw"]["cwd"] == "C:/proj"
+    if sys.platform == "win32":
+        assert captured["kw"]["creationflags"] == 0x00000010  # CREATE_NEW_CONSOLE
+
+
 def test_gui_helpers():
     from cloophole import gui, state
     st = state.State(phase=state.WAITING, reset_at="2099-01-01T00:00:00+00:00")

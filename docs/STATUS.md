@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B18 — GUI self-detects sessions; refresh loop hardened)
+**Last updated:** 2026-06-23 (ADR-0011 — visible resume; watch Claude work)
 
 ## Active task
+**Visible resume (ADR-0011) — DONE on `main`, pending CI + user verify.**
+Resume now opens `claude --continue` in a VISIBLE window (`fire.fire_visible`,
+`CREATE_NEW_CONSOLE`, non-blocking) — the user watches the resumed work instead of
+hidden edits (their complaint: mystery untracked files). `config.resume_visible`
+(default True) governs both the GUI button and the daemon auto-resume; False = headless
+(re-arm). Still Golden-Rule-clean (public CLI, no REPL injection). 49 tests.
+
+## (prior) Active task
 **B18 fix — spawned GUI showed no sessions — DONE on `main`, pending CI + user verify.**
 State + CLI detected fine, but the `open`-spawned window showed none (foreground did):
 the GUI relied on the daemon writing `live_dirs` + a fragile 1s refresh loop. Fix: the

@@ -91,17 +91,30 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
     last_error = None
     relimit_text = None
     fired_ok = False
-    for d in dirs:
-        res = fire.fire(d, st.queue_note, cfg)
-        if res.error:
-            last_error = res.error
-            log(f"  ERROR in {d or '(cwd)'}: {res.error}")
-        elif res.still_limited:
-            relimit_text = res.new_reset_text
-            log(f"  still limited in {d or '(cwd)'}")
-        else:
-            fired_ok = True
-            log(f"  fired {d or '(cwd)'} rc={res.returncode}")
+    if cfg.get("resume_visible", True):
+        # Open each resume in its own visible window so the user can watch Claude
+        # work (no hidden edits). The re-check probes already confirmed the reset, so
+        # we don't need headless still_limited detection here.
+        for d in dirs:
+            err = fire.fire_visible(d, st.queue_note, cfg)
+            if err:
+                last_error = err
+                log(f"  ERROR in {d or '(cwd)'}: {err}")
+            else:
+                fired_ok = True
+                log(f"  opened visible resume in {d or '(cwd)'}")
+    else:
+        for d in dirs:
+            res = fire.fire(d, st.queue_note, cfg)
+            if res.error:
+                last_error = res.error
+                log(f"  ERROR in {d or '(cwd)'}: {res.error}")
+            elif res.still_limited:
+                relimit_text = res.new_reset_text
+                log(f"  still limited in {d or '(cwd)'}")
+            else:
+                fired_ok = True
+                log(f"  fired {d or '(cwd)'} rc={res.returncode}")
 
     # Any dir still limited -> the reset didn't really land; re-arm.
     if relimit_text:

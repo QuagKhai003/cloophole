@@ -29,6 +29,7 @@ DEFAULTS: dict[str, Any] = {
     "limit_window_hours": 5,        # est. reset window when the rate-limit hook fires
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
+    "resume_visible": True,         # resume in a visible window (watch Claude) vs headless
 }
 
 
