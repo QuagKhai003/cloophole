@@ -3,9 +3,18 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B16 — sticky per-folder session list; kill residual flicker)
+**Last updated:** 2026-06-23 (limit re-check probes + fix Resume-ticked firing)
 
 ## Active task
+**Limit re-check + Resume fix — DONE on `main`, pending CI + user verify.**
+(1) B17: "Resume ticked sessions" fired nothing — it read raw `live_dirs` not the sticky
+ticked list; now fires the displayed-ticked folders. (2) Re-check: WAITING schedules two
+probes (`recheck_at`, ~detection+10min and reset−10min) to confirm the estimated limit
+is real — a clear probe resumes early (catches a plan upgrade that reset early), a
+still-limited probe refines the estimate. Config `recheck_after_min`/`recheck_before_min`.
+47 tests. (Flicker B13/B14/B16 + open self-kill B15 all resolved.)
+
+## (prior) Active task
 **B16 fix — residual session-list flicker — DONE on `main`, pending CI + user verify.**
 A single session's PEB folder read flaking for a tick dropped it from `live_dirs` until
 the next 15s tick. GUI now keeps each folder sticky ~22 refreshes after last seen (>

@@ -48,6 +48,7 @@ class State:
     last_error: Optional[str] = None
     last_poll: Optional[str] = None       # last idle probe (ISO UTC)
     hook_dir: Optional[str] = None        # cwd from the rate-limit hook (fire fallback)
+    recheck_at: list = field(default_factory=list)  # pending probe re-checks (ISO UTC)
     live_session: bool = False            # last observed
     live_dirs: list = field(default_factory=list)  # cwds of every live session (display)
     excluded_dirs: list = field(default_factory=list)  # sessions the user un-ticked (skip on fire)

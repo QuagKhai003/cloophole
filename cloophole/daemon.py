@@ -119,6 +119,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.reset_at = None
         st.limit_text = None
         st.hook_dir = None
+        st.recheck_at = []
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
@@ -143,11 +144,19 @@ def tick(cfg: dict) -> state.State:
         claude_hook.clear_signal()
         if st.phase in (state.WATCHING, state.ARMED, state.FIRED, state.ERROR):
             hours = cfg.get("limit_window_hours", 5)
-            st.reset_at = (now + timedelta(hours=hours)).isoformat()
+            reset = now + timedelta(hours=hours)
+            st.reset_at = reset.isoformat()
             st.limit_text = f"rate-limit hook @ {sig.get('ts')}"
             st.hook_dir = sig.get("cwd")
             st.phase = state.WAITING
-            log(f"rate-limit hook -> WAITING, est reset {st.reset_at}, dir={st.hook_dir}")
+            # Surgical re-checks (a probe confirms reality, e.g. a plan upgrade that
+            # cleared the limit early): once shortly after detection, once near the
+            # estimated reset. Only future times, soonest first.
+            after = now + timedelta(minutes=cfg.get("recheck_after_min", 10))
+            before = reset - timedelta(minutes=cfg.get("recheck_before_min", 10))
+            st.recheck_at = sorted(t.isoformat() for t in (after, before) if t > now)
+            log(f"rate-limit hook -> WAITING, est reset {st.reset_at}, dir={st.hook_dir}, "
+                f"rechecks={st.recheck_at}")
             state.save(st)
             return st
 
@@ -165,6 +174,26 @@ def tick(cfg: dict) -> state.State:
         return st
 
     if st.phase == state.WAITING:
+        # Due re-check? Probe once to confirm the limit is real (catches an early reset).
+        if st.recheck_at:
+            try:
+                nxt = datetime.fromisoformat(st.recheck_at[0])
+            except (ValueError, TypeError):
+                nxt = None
+            if nxt is None or now >= nxt:
+                st.recheck_at = st.recheck_at[1:]
+                limited, text = probe.probe(cfg)
+                if not limited:
+                    log("recheck: no longer limited -> reset reached early")
+                    st.reset_at = now.isoformat()  # let the reset logic below fire
+                else:
+                    from .reset_parser import parse_reset
+                    dt = parse_reset(text or "")
+                    if dt:
+                        st.reset_at = dt.isoformat()  # refine the estimate
+                    log(f"recheck: still limited (reset ~{st.reset_at})")
+                    state.save(st)
+                    return st
         rst = st.reset_dt()
         if rst and now >= rst:
             if live:
