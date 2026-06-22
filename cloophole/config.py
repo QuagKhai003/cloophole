@@ -19,7 +19,7 @@ DEFAULTS: dict[str, Any] = {
     "claude_path": "claude",        # executable name or full path
     "permission_mode": "acceptEdits",  # non-interactive; headless can't confirm
     "daemon_tick_sec": 15,          # main loop cadence
-    "poll_enabled": False,          # Phase 3 idle probing; off by default
+    "poll_enabled": True,           # auto-watch: probe for the limit on its own
     "poll_interval_min": 30,        # gentle, probing costs quota
     "fire_timeout_sec": 1800,       # cap a single --continue run
     "claude_process_name": "claude.exe",
