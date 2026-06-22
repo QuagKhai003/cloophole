@@ -35,6 +35,14 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B16 — residual session-list flicker (one folder drops per flaky PEB read)**
+  (user-reported 2026-06-23). With one clean daemon, the list still blinked ~every tick:
+  the daemon re-detects every `daemon_tick_sec` (15s) and a single session's PEB cwd read
+  can fail for a tick, dropping that folder from `live_dirs` until the next tick. The B14
+  whole-list hold only covered a *full* blank, not one folder dropping. **Fix:** the GUI
+  keeps each folder **sticky** for ~22 refreshes after it was last seen (> the 15s tick),
+  so a missed read can't blink it; `winproc.detect_all` also retries the read once.
+  RESOLVED 2026-06-23 (`cloophole/gui.py`, `cloophole/winproc.py`).
 - **B15 — `cloophole open` killed itself (kill_all tree-killed the bootloader)**
   (user-reported 2026-06-23). After B14 wired `kill_all` into `open`, no window
   appeared. A PyInstaller onefile app is two processes — a bootloader (parent) + the

@@ -207,7 +207,9 @@ def detect_all(process_name: str) -> tuple[bool, list[str]]:
         return False, []
     seen: list[str] = []
     for pid in pids:
-        cwd = process_cwd(pid)
+        # one retry: the PEB read can flake for a tick, which would otherwise drop a
+        # live session's folder and make the GUI list blink (B16).
+        cwd = process_cwd(pid) or process_cwd(pid)
         if cwd and cwd not in seen:
             seen.append(cwd)
     return True, seen

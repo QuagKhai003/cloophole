@@ -3,9 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B15 — open killed itself via kill_all; spare the bootloader)
+**Last updated:** 2026-06-23 (B16 — sticky per-folder session list; kill residual flicker)
 
 ## Active task
+**B16 fix — residual session-list flicker — DONE on `main`, pending CI + user verify.**
+A single session's PEB folder read flaking for a tick dropped it from `live_dirs` until
+the next 15s tick. GUI now keeps each folder sticky ~22 refreshes after last seen (>
+the tick), and `winproc.detect_all` retries the read once. 44 tests. With B15 (open no
+longer self-kills) + B13/B14, the list should now be stable.
+
+## (prior) Active task
 **B15 fix — `cloophole open` showed no window again — DONE on `main`, pending CI +
 user verify.** B14's `kill_all` in `open` tree-killed the PyInstaller bootloader parent
 (`/T`), cascading to the open process itself before it launched the GUI. Fix:
