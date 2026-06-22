@@ -37,7 +37,7 @@ cloophole/        # the package — one module per responsibility
   state.py        #   durable state machine record (the source of truth)
   reset_parser.py #   limit text -> UTC reset timestamp
   winproc.py      #   Windows claude.exe detection + PEB cwd read + pid_alive
-  fire.py         #   run `claude --continue` headless
+  fire.py         #   run `claude --continue` — visible window (default) or headless
   probe.py        #   idle quota probe (opt-in; OFF by default)
   claude_hook.py  #   zero-quota limit auto-detect via Claude StopFailure hook
   subproc.py      #   no-window subprocess wrapper

@@ -55,6 +55,15 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `limit_window_hours` | `5` | estimated reset window when the rate-limit hook fires |
 | `recheck_after_min` | `10` | probe to confirm the limit ~10 min after it's detected |
 | `recheck_before_min` | `10` | probe to confirm again ~10 min before the estimated reset |
+| `resume_visible` | `true` | resume in a visible window (`fire_visible`) so the user watches; `false` = headless (re-arm) |
+
+## Resume modes (`cloophole/fire.py`, ADR-0011)
+- `fire_visible(dir, note)` — default. Launches `claude --continue [note]` in a new
+  visible console (`CREATE_NEW_CONSOLE`) in `dir`, non-blocking; the user watches the
+  resume. Public-CLI only; never injects into the existing REPL. Returns an error
+  string only on launch failure.
+- `fire(dir, note)` — headless (`CREATE_NO_WINDOW`, captured). Used when
+  `resume_visible=False`; the only mode that detects `still_limited` to re-arm.
 
 ## `FireResult` (`cloophole/fire.py`)
 `ok: bool`, `still_limited: bool`, `new_reset_text: str|None`, `stdout`, `stderr`,

@@ -19,11 +19,14 @@ permission mode or it blocks on confirmations no one can answer (§9.5).
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Optional
 
 from . import config, subproc
 from .reset_parser import is_limit_message
+
+CREATE_NEW_CONSOLE = 0x00000010  # open the resume in its own visible window
 
 FALLBACK_NOTE = "continue where you left off before the usage limit"
 
@@ -46,6 +49,30 @@ class FireResult:
     stderr: str
     returncode: Optional[int]
     error: Optional[str] = None
+
+
+def fire_visible(work_dir: Optional[str], queue_note: Optional[str],
+                 cfg: Optional[dict] = None) -> Optional[str]:
+    """Resume in a VISIBLE terminal window so the user can watch Claude work.
+
+    Launches `claude --continue [prompt]` in its own console (CREATE_NEW_CONSOLE) in
+    the work dir, non-blocking. Still public-CLI only and never touches the user's
+    existing REPL (Golden Rule). Returns None on launch, or an error string.
+    """
+    cfg = cfg or config.load()
+    args = [cfg["claude_path"], "--continue"]
+    note = (queue_note or "").strip()
+    if note:
+        args.append(build_prompt(queue_note))  # initial guidance for the resume
+    flags = CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+    try:
+        subprocess.Popen(args, cwd=work_dir or None, creationflags=flags,
+                         close_fds=True)
+        return None
+    except FileNotFoundError:
+        return f"claude not found: {cfg['claude_path']}"
+    except OSError as e:
+        return str(e)
 
 
 def fire(work_dir: Optional[str], queue_note: Optional[str], cfg: Optional[dict] = None) -> FireResult:

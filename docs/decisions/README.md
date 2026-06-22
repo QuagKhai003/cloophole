@@ -18,3 +18,4 @@ Copy `0000-template.md` → `NNNN-<slug>.md` and link it below.
 | 0008 | Zero-quota limit auto-detect via Claude `StopFailure` hook | Accepted — COMPLETE (supersedes 0002 as default) |
 | 0009 | Clean uninstall: sweep cloophole.exe by name + deregister hook | Accepted — COMPLETE |
 | 0010 | Per-session tick boxes choose where to resume (+ GUI redesign) | Accepted — COMPLETE |
+| 0011 | Resume in a visible window (watch Claude work) | Accepted — COMPLETE |

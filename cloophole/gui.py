@@ -312,24 +312,23 @@ def run() -> None:
         if not targets:
             messagebox.showinfo("cloophole", "No sessions are ticked to resume.")
             return
-        v_status.config(text="Resuming your Claude work…")
-
-        def work():
-            note = state.load().queue_note
-            results = [fire.fire(d, note) for d in targets]
-            ok = sum(1 for r in results if r.ok and not r.still_limited)
-            limited = sum(1 for r in results if r.still_limited)
-            errs = [r.error for r in results if r.error]
-            if errs:
-                msg = f"Couldn't resume {len(errs)} session(s): {errs[0]}"
-            elif limited and not ok:
-                msg = "Still limited — the reset hasn't landed yet."
+        # Open each resume in its OWN visible terminal so you watch Claude work
+        # (non-blocking — no waiting on the call).
+        note = state.load().queue_note
+        launched, errs = 0, []
+        for d in targets:
+            err = fire.fire_visible(d, note)
+            if err:
+                errs.append(err)
             else:
-                msg = f"Resumed {ok} session(s)." + (
-                    f" {limited} still limited." if limited else "")
-            root.after(0, lambda: messagebox.showinfo("cloophole", msg))
-
-        threading.Thread(target=work, daemon=True).start()
+                launched += 1
+        if launched:
+            messagebox.showinfo(
+                "cloophole",
+                f"Opened {launched} Claude window(s) — watch them continue.")
+        else:
+            messagebox.showwarning(
+                "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")
 
     def enter_limit():
         text = simpledialog.askstring(
