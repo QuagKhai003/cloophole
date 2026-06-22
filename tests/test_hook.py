@@ -78,6 +78,16 @@ def test_daemon_consumes_signal_into_waiting(env, monkeypatch):
     assert claude_hook.read_signal() is None  # consumed
 
 
+def test_daemon_records_live_dirs_for_gui(env, monkeypatch):
+    _, daemon, state, config = env
+    monkeypatch.setattr(daemon, "detect_sessions",
+                        lambda c: (True, ["C:/a", "C:/b"]))
+    state.save(state.State(phase=state.WATCHING))
+    out = daemon.tick(config.load())
+    assert out.live_dirs == ["C:/a", "C:/b"]
+    assert out.live_session is True
+
+
 def test_fire_dirs_falls_back_to_hook_dir(env):
     _, daemon, state, _ = env
     st = state.State(work_dir=None, hook_dir="C:/work/proj")

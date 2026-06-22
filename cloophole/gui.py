@@ -64,8 +64,7 @@ def run() -> None:
     root = tk.Tk()
     root.title("cloophole")
     root.configure(bg=BG)
-    root.geometry("440x600")  # tall enough for all rows; clamped to content below
-    root.minsize(440, 560)
+    root.resizable(True, True)  # geometry is fit to content at the end of run()
 
     def lbl(parent, text, color=FG, font=("Segoe UI", 10), **kw):
         return tk.Label(parent, text=text, bg=kw.pop("bg", BG), fg=color, font=font, **kw)
@@ -114,9 +113,15 @@ def run() -> None:
          "Auto-detect: OFF - run `cloophole hook on`, or enter the limit time below."),
         SUB, ("Segoe UI", 9)).pack(anchor="w", padx=18, pady=(8, 0))
 
-    # --- actions ---
+    # --- actions (pinned to the bottom so they're never clipped) ---
     btns = tk.Frame(root, bg=BG)
-    btns.pack(fill="x", padx=14, pady=10)
+    btns.pack(fill="x", padx=14, pady=10, side="bottom")
+
+    # --- detected Claude sessions (fills the space above the buttons) ---
+    lbl(root, "Claude sessions detected now:", SUB, ("Segoe UI", 9)).pack(
+        anchor="w", padx=18, pady=(8, 0))
+    v_sessions = lbl(root, "", FG, ("Segoe UI", 9), justify="left")
+    v_sessions.pack(anchor="w", fill="x", expand=True, padx=18, pady=(0, 2))
 
     def mkbtn(text, cmd, col, accent=False):
         b = tk.Button(btns, text=text, command=cmd, relief="flat",
@@ -203,6 +208,20 @@ def run() -> None:
         if st.last_error:
             meta += f"\nLast problem: {st.last_error}"
         v_meta.config(text=meta)
+
+        # detected sessions, named by folder (OS process inspection only)
+        from pathlib import Path
+        dirs = list(st.live_dirs or [])
+        if dirs:
+            shown = dirs[:6]
+            lines = [f"• {Path(d).name or d}    ({d})" for d in shown]
+            if len(dirs) > len(shown):
+                lines.append(f"  …and {len(dirs) - len(shown)} more")
+            v_sessions.config(text="\n".join(lines), fg=FG)
+        elif st.live_session:
+            v_sessions.config(text="• a Claude session is open (folder unreadable)", fg=SUB)
+        else:
+            v_sessions.config(text="• none right now", fg=SUB)
         root.after(1000, refresh)
 
     def _cleanup():
@@ -212,9 +231,12 @@ def run() -> None:
             pass
 
     root.protocol("WM_DELETE_WINDOW", lambda: (_cleanup(), root.destroy()))
-    # Fit the window to its actual content so no button is clipped (DPI/font safe).
+    # Fit the window to its actual content so nothing is clipped (DPI/font safe).
+    # Buttons are bottom-pinned, so even if this under-measures they stay visible;
+    # the small margin covers the session list growing as sessions appear.
     root.update_idletasks()
-    fit_w, fit_h = max(440, root.winfo_reqwidth()), root.winfo_reqheight()
+    fit_w = max(480, root.winfo_reqwidth())
+    fit_h = root.winfo_reqheight() + 12
     root.geometry(f"{fit_w}x{fit_h}")
     root.minsize(fit_w, fit_h)
     refresh()

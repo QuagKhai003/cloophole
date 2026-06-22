@@ -17,6 +17,7 @@ Persisted as `~/.cloophole/state.json`. The single source of truth for the machi
 | `last_poll` | ISO \| None | last idle probe (gates poll cadence) |
 | `hook_dir` | path \| None | cwd from the rate-limit hook; `_fire_dirs` fallback when no live cwd |
 | `live_session` | bool | last observed gate result |
+| `live_dirs` | list[path] | cwds of every live session, written by the daemon for the GUI list |
 | `updated_at` | ISO | set on every `save()` |
 
 ### Phases (state machine, plan §7)
@@ -81,11 +82,13 @@ reads + clears it and, from WATCHING/ARMED/FIRED/ERROR, arms WAITING with
 
 ## UI — desktop window (`cloophole/gui.py`)
 `gui.run()` is the interface (ADR-0007): a Tkinter window showing live status (phase in
-plain language, countdown, watcher up?, Claude open now, resume-where) with a note
-field, an auto-detect checkbox, and buttons (Resume now, Enter limit time, Choose
-folder, Reset status, Stop watching, Close). Auto-refreshes every 1 s from `state.json`;
-`fire` runs on a worker thread so the window stays responsive. Stdlib `tkinter` only.
-Closing the window leaves the watcher running. (`menu.py`, `ui.py`, `app.py` removed.)
+plain language, countdown, watcher up?, Claude open now, resume-where), a note field, a
+hook on/off line (zero-quota auto-detect; the poll checkbox is gone — ADR-0008), a list
+of **detected Claude sessions named by folder** (from `state.live_dirs`), and buttons
+(Resume now, Enter limit time, Choose folder, Reset status, Stop watching, Close). The
+action buttons are bottom-pinned and the window fits its content (`winfo_reqheight`), so
+nothing clips. Auto-refreshes every 1 s from `state.json`; `fire` runs on a worker
+thread. Stdlib `tkinter` only. Closing the window leaves the watcher running.
 
 ## App lifecycle (`cloophole/runner.py`, `daemon.py`, `gui.py`)
 - **Background watcher** = a detached, hidden, single-instance daemon process running
