@@ -50,6 +50,7 @@ class State:
     hook_dir: Optional[str] = None        # cwd from the rate-limit hook (fire fallback)
     live_session: bool = False            # last observed
     live_dirs: list = field(default_factory=list)  # cwds of every live session (display)
+    excluded_dirs: list = field(default_factory=list)  # sessions the user un-ticked (skip on fire)
     updated_at: str = field(default_factory=_now_iso)
 
     def reset_dt(self) -> Optional[datetime]:

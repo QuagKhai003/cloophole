@@ -94,3 +94,16 @@ def test_fire_dirs_falls_back_to_hook_dir(env):
     assert daemon._fire_dirs(st, []) == ["C:/work/proj"]
     # a live cwd still wins over the hook fallback
     assert daemon._fire_dirs(st, ["C:/live"]) == ["C:/live"]
+
+
+def test_fire_dirs_respects_unticked_sessions(env):
+    _, daemon, state, _ = env
+    st = state.State(excluded_dirs=["C:/b"])
+    # only the ticked (non-excluded) live sessions fire
+    assert daemon._fire_dirs(st, ["C:/a", "C:/b", "C:/c"]) == ["C:/a", "C:/c"]
+    # un-ticking all live sessions -> fire nowhere
+    st2 = state.State(excluded_dirs=["C:/a", "C:/b"])
+    assert daemon._fire_dirs(st2, ["C:/a", "C:/b"]) == []
+    # a pin still overrides the tick boxes
+    st3 = state.State(work_dir="C:/pin", excluded_dirs=["C:/a"])
+    assert daemon._fire_dirs(st3, ["C:/a"]) == ["C:/pin"]

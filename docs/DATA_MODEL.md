@@ -18,6 +18,7 @@ Persisted as `~/.cloophole/state.json`. The single source of truth for the machi
 | `hook_dir` | path \| None | cwd from the rate-limit hook; `_fire_dirs` fallback when no live cwd |
 | `live_session` | bool | last observed gate result |
 | `live_dirs` | list[path] | cwds of every live session, written by the daemon for the GUI list |
+| `excluded_dirs` | list[path] | sessions the user **un-ticked** in the GUI; `_fire_dirs` skips them (ADR-0010) |
 | `updated_at` | ISO | set on every `save()` |
 
 ### Phases (state machine, plan §7)
@@ -33,9 +34,10 @@ FIRING   --error--> ERROR --> WATCHING
 FIRED/ERROR are transient: `daemon._do_fire` lands back on WATCHING within the tick.
 
 **Fire targets (`daemon._fire_dirs`):** a pinned `work_dir` wins; else `--continue`
-runs once per live session directory (`winproc.detect_all`, deduped) — "fire in all
-selected terminals"; else once in the inherited cwd. Any dir reporting still-limited
-re-arms WAITING.
+runs once per **ticked** live session directory (`live_dirs − excluded_dirs`, ADR-0010)
+— default all ticked; un-ticking all → fire nowhere (`_do_fire` no-ops). With no live
+dir, fall back to the rate-limit hook's `hook_dir`, else the inherited cwd. Any dir
+reporting still-limited re-arms WAITING.
 
 ## Config keys (`cloophole/config.py`)
 Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.

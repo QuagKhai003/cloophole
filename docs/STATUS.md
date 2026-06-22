@@ -3,9 +3,18 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0009 clean uninstall — sweep orphans + drop hook)
+**Last updated:** 2026-06-23 (ADR-0010 — session tick boxes + GUI redesign)
 
 ## Active task
+**Session tick boxes + GUI redesign (ADR-0010) — DONE on `main`, pending CI + user
+verify.** Detection confirmed working (folders read: cloophole, bull-buddy). GUI now
+lists each detected session with a checkbox (default all ticked; `state.excluded_dirs`
+stores un-ticks), in a scrollable card so it never hides behind the buttons; "Resume"
+fires only the ticked sessions; `_fire_dirs` honours the ticks (pin still overrides).
+Refreshed visuals (phase badge, bordered cards, hover, all/none toggles). 42 tests.
+NEXT: CI build; user verifies the list + tick→resume + look. Then Phase 6.
+
+## (prior) Active task
 **Clean uninstall (ADR-0009) — DONE on `main`, pending CI build + user verify.**
 `runner.kill_all()` sweeps every `cloophole.exe` by name (excl. self, frozen-only),
 wired into `close` + `uninstall`; uninstall also deregisters the rate-limit hook;
