@@ -76,9 +76,10 @@ def test_spawn_silences_stdio(env, monkeypatch):
     assert captured["stderr"] == subprocess.DEVNULL
 
 
-def test_spawn_no_visible_console(env, monkeypatch):
-    """CREATE_NO_WINDOW must NOT be combined with DETACHED_PROCESS (0x8): Win32
-    ignores no-window when detached, leaving a blank console window. Regression."""
+def test_spawn_no_console_but_window_shows(env, monkeypatch):
+    """CREATE_NO_WINDOW alone: not combined with DETACHED_PROCESS (0x8, which makes
+    Win32 ignore no-window -> blank console, B8), and NOT with STARTUPINFO SW_HIDE
+    (which also hides the GUI's own window -> no window, B10)."""
     import sys
     if sys.platform != "win32":
         import pytest
@@ -89,9 +90,11 @@ def test_spawn_no_visible_console(env, monkeypatch):
                         lambda *a, **k: captured.update(k))
     runner._spawn("_gui")
     flags = captured["creationflags"]
-    assert flags & 0x08000000          # CREATE_NO_WINDOW set
-    assert not (flags & 0x00000008)    # DETACHED_PROCESS NOT set
-    assert captured["startupinfo"].wShowWindow == 0  # SW_HIDE
+    assert flags & 0x08000000          # CREATE_NO_WINDOW set (no console)
+    assert not (flags & 0x00000008)    # DETACHED_PROCESS NOT set (B8)
+    # No SW_HIDE startupinfo, which would hide the GUI window itself (B10).
+    si = captured.get("startupinfo")
+    assert si is None or not (si.dwFlags & 0x00000001)  # STARTF_USESHOWWINDOW unset
 
 
 def test_gui_launch_skips_when_running(env, monkeypatch):

@@ -3,9 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B9 — idle probe drained quota; poll now OFF by default)
+**Last updated:** 2026-06-23 (B10 — GUI opened hidden; SW_HIDE regression from B8)
 
 ## Active task
+**B10 fix — GUI opened hidden (no window) — DONE (branch
+`fix/gui-window-hidden-swhide`), awaiting user verify.** B8's anti-console
+`STARTUPINFO SW_HIDE` also hid the Tk window (nCmdShow=SW_HIDE). Fix: `CREATE_NO_WINDOW`
+alone — no console, window shows. Can only be confirmed on the frozen exe (source uses
+windowless pythonw), so the USER builds/installs and reports. 29 tests.
+
+## (prior) Active task
 **B9 mitigation — idle probe spent quota in the background — DONE (branch
 `fix/poll-off-by-default`).** `poll_enabled` now defaults **False**; the `claude -p`
 probe is opt-in only. GUI checkbox warns it costs usage. Tests updated. **Next, real

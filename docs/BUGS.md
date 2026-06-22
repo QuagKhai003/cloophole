@@ -47,6 +47,15 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B10 — GUI opens hidden (no window) — SW_HIDE regression from B8**
+  (user-reported 2026-06-23). The B8 fix added `STARTUPINFO` with
+  `STARTF_USESHOWWINDOW | SW_HIDE` to kill the console. But that `wShowWindow=SW_HIDE`
+  is the child's `nCmdShow`, which Tk applies to its first top-level window — so the
+  GUI was created hidden and never appeared (no console *and* no window). **Fix:**
+  `CREATE_NO_WINDOW` alone — it suppresses the console for a console-subsystem exe
+  without hiding the GUI window; dropped the SW_HIDE STARTUPINFO.
+  RESOLVED 2026-06-23 (`cloophole/runner.py`). NOTE: visibility can only be confirmed
+  with the frozen exe (source spawns windowless pythonw) — verified by the user.
 - **B8 — blank console window behind the GUI; window too short (buttons clipped)**
   (user-reported 2026-06-22, after B7). (a) `_spawn` passed
   `DETACHED_PROCESS | CREATE_NO_WINDOW` together; Win32 *ignores* CREATE_NO_WINDOW
