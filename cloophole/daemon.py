@@ -124,6 +124,7 @@ def tick(cfg: dict) -> state.State:
     st = state.load()
     live, cwds = detect_sessions(cfg)
     st.live_session = live
+    st.live_dirs = list(cwds)  # for the GUI session list
     now = datetime.now(timezone.utc)
 
     # Zero-quota auto-detect: Claude's StopFailure/rate_limit hook dropped a signal.

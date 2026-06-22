@@ -3,9 +3,18 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0008 — zero-quota rate-limit hook; poll out of GUI)
+**Last updated:** 2026-06-23 (ADR-0008 hook + GUI: session list, bottom-pinned buttons)
 
 ## Active task
+**GUI polish + hook (ADR-0008) — DONE on `main`, pending CI build + user verify.**
+Hook auto-detect shipped (poll checkbox gone). GUI now lists detected Claude sessions
+by folder name (`state.live_dirs`, written by the daemon), pins the action buttons to
+the window bottom, and fits the window to its content so nothing clips (the user had to
+resize before). 37 tests. NEXT: trigger one CI build; user reinstalls + verifies
+window fit + session list + `hook on` status. Then: clean-uninstall hardening (their
+other ask), then Phase 6 polish.
+
+## (prior) Active task
 **ADR-0008 — zero-quota limit auto-detect via Claude hook — DONE (branch
 `feat/limit-hook`), pending GUI-polish branch + CI build.** `claude_hook.py` registers
 a `StopFailure`/`rate_limit` hook that runs `cloophole limit-signal`; the daemon
