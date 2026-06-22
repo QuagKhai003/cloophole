@@ -194,11 +194,17 @@ def cmd_daemon(_args: list[str]) -> int:
 
 
 def cmd_open(_args: list[str]) -> int:
-    """Start the background watcher (if needed) and open the app window."""
+    """Clean-restart the background watcher and open the app window.
+
+    Sweeps any existing/orphan cloophole processes first so EXACTLY ONE current
+    daemon runs — duplicates (e.g. left over from an upgrade) would otherwise race
+    on state.json and make the session list flicker (B14)."""
     from . import claude_hook, runner
-    if not runner.is_running():
-        runner.launch()
-        print("cloophole watcher started in the background.")
+    runner.stop_gui()
+    runner.stop()
+    runner.kill_all()  # drop orphan/duplicate daemons + windows (frozen)
+    runner.launch()
+    print("cloophole watcher started in the background.")
     # Zero-quota auto-detect: register the rate-limit hook in Claude's settings.
     try:
         newly = not claude_hook.hook_installed()
@@ -210,10 +216,8 @@ def cmd_open(_args: list[str]) -> int:
                   "`cloophole hook off` to remove)")
     except Exception:
         pass
-    if runner.launch_gui():
-        print("Opening cloophole...")
-    else:
-        print("cloophole window is already open.")
+    runner.launch_gui()
+    print("Opening cloophole...")
     return 0
 
 

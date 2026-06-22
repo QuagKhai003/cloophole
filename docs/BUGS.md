@@ -35,6 +35,16 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B14 — session list still flickered (duplicate/orphan daemons race on state)**
+  (user-reported 2026-06-23, after B13). B13's daemon-side smoothing only governs ONE
+  daemon. After many upgrade/reinstall cycles, an orphan daemon from an older build kept
+  running and writing empty `live_dirs`, so the GUI alternated between the list and
+  "folder unreadable". **Fix:** (a) `cloophole open` now clean-restarts —
+  `stop_gui`+`stop`+`kill_all` then `launch` — so exactly one current daemon runs;
+  (b) the GUI holds the last good list for ~8 refreshes before declaring it empty, so it
+  stays steady even if state momentarily blanks. RESOLVED 2026-06-23
+  (`cloophole/__main__.py`, `cloophole/gui.py`). Existing orphans: a one-time
+  `Get-Process cloophole | Stop-Process -Force` then `cloophole open`.
 - **B13 — GUI: session list flickered; status card had a big empty gap**
   (user-reported 2026-06-23). (a) A transient `claude.exe` PEB-read miss made
   `live_dirs` blink empty between ticks, so the GUI tore down + rebuilt the list →

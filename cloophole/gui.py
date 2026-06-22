@@ -219,20 +219,32 @@ def run() -> None:
         state.save(st)
         _update_count()
 
-    _rendered = {"dirs": None}
+    # _shown = the dirs currently drawn; _hold counts consecutive empty reads so a
+    # transient blank (or a stray old daemon writing []) doesn't tear the list down.
+    _rendered = {"dirs": None, "shown": [], "hold": 0}
+    _EMPTY_HOLD = 8  # ~8s of refreshes before we believe the list is really empty
+
+    def _effective_dirs() -> list:
+        dirs = sorted(state.load().live_dirs or [])
+        if dirs:
+            _rendered["shown"] = dirs
+            _rendered["hold"] = 0
+            return dirs
+        _rendered["hold"] += 1
+        if _rendered["shown"] and _rendered["hold"] < _EMPTY_HOLD:
+            return _rendered["shown"]  # keep the last good list briefly
+        _rendered["shown"] = []
+        return []
 
     def _update_count():
-        st = state.load()
-        dirs = list(st.live_dirs or [])
-        ex = set(st.excluded_dirs or [])
+        dirs = _rendered["dirs"] or []
+        ex = set(state.load().excluded_dirs or [])
         ticked = sum(1 for d in dirs if d not in ex)
         v_sesscount.config(text=f"({ticked} of {len(dirs)} ticked)" if dirs else "")
 
     def _render_sessions(force: bool = False) -> None:
         st = state.load()
-        # Sort so process-enumeration order jitter doesn't trigger a rebuild (flicker);
-        # only a real change in the SET of folders rebuilds the rows.
-        dirs = sorted(st.live_dirs or [])
+        dirs = _effective_dirs()
         if not force and dirs == _rendered["dirs"]:
             _update_count()
             return
