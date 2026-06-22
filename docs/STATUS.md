@@ -3,9 +3,16 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (B8 fix — blank console window + clipped GUI buttons)
+**Last updated:** 2026-06-23 (B9 — idle probe drained quota; poll now OFF by default)
 
 ## Active task
+**B9 mitigation — idle probe spent quota in the background — DONE (branch
+`fix/poll-off-by-default`).** `poll_enabled` now defaults **False**; the `claude -p`
+probe is opt-in only. GUI checkbox warns it costs usage. Tests updated. **Next, real
+fix:** replace polling with a Claude Code **`StopFailure`/`rate_limit` hook** (zero
+quota, Golden-Rule clean; hook `cwd` also fixes B6) — needs a new ADR. See BUGS B9.
+
+## (prior) Active task
 **B8 fix — blank console behind GUI + clipped buttons — DONE (branch
 `fix/gui-window-console-and-size`).** `_spawn` combined `DETACHED_PROCESS |
 CREATE_NO_WINDOW`; Win32 ignores no-window when detached, so the console exe showed a

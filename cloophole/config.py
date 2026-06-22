@@ -19,8 +19,11 @@ DEFAULTS: dict[str, Any] = {
     "claude_path": "claude",        # executable name or full path
     "permission_mode": "acceptEdits",  # non-interactive; headless can't confirm
     "daemon_tick_sec": 15,          # main loop cadence
-    "poll_enabled": True,           # auto-watch: probe for the limit on its own
-    "poll_interval_min": 30,        # gentle, probing costs quota
+    "poll_enabled": False,          # OFF by default: the `claude -p` probe spends
+                                    # your quota every interval even when you're not
+                                    # limited. Opt in explicitly (`poll on`) or prefer
+                                    # the zero-cost StopFailure hook. See docs/BUGS B9.
+    "poll_interval_min": 30,        # gentle, but probing still costs quota
     "fire_timeout_sec": 1800,       # cap a single --continue run
     "claude_process_name": "claude.exe",
 }

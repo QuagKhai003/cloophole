@@ -111,6 +111,8 @@ def run() -> None:
                    command=toggle_auto, bg=BG, fg=FG, selectcolor=CARD,
                    activebackground=BG, activeforeground=FG, font=("Segoe UI", 9)
                    ).pack(anchor="w", padx=14, pady=(8, 0))
+    lbl(root, "(off by default - this probes Claude on a timer and spends a little "
+              "of your usage)", SUB, ("Segoe UI", 8)).pack(anchor="w", padx=18)
 
     # --- actions ---
     btns = tk.Frame(root, bg=BG)

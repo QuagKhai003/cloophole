@@ -4,6 +4,18 @@
 
 ## Open
 
+### B9 — idle probe spends the user's quota in the background (design flaw)
+With `poll_enabled` on, `daemon.tick` runs `probe()` (`claude -p`) every
+`poll_interval_min` while WATCHING to auto-detect a limit. Each probe is a live Claude
+call that **costs quota even when you are not limited** — so an idle machine quietly
+burns usage (user-reported: "drained my usage while doing nothing"). It also spends
+the very resource the tool exists to protect.
+**Impact:** HIGH (trust/cost). **Status:** mitigated 2026-06-23 — `poll_enabled`
+now defaults **False** (opt-in), GUI checkbox warns of the cost. **Proper fix
+(planned):** replace polling with a Claude Code **`StopFailure`/`rate_limit` hook**
+that signals the limit for free (the hook's `cwd` also addresses B6). New ADR.
+**Where:** `cloophole/probe.py`, `cloophole/daemon.py`, `cloophole/config.py`.
+
 ### B1 — PEB cwd read is 64-bit only
 `winproc.process_cwd` uses hard-coded 64-bit PEB/RTL_USER_PROCESS_PARAMETERS
 offsets. A 32-bit `claude.exe` (or 32-bit Python reading a 64-bit target) yields no
