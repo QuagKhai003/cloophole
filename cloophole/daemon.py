@@ -205,6 +205,16 @@ def loop(cfg: dict, stop: "object | None" = None) -> None:
         stop.wait(interval)
 
 
+def _trim_memory() -> None:
+    """Shrink the long-lived watcher's footprint: collect once, freeze the
+    survivors out of GC tracking (less churn), and relax thresholds so the idle
+    loop barely allocates/collects."""
+    import gc
+    gc.collect()
+    gc.freeze()
+    gc.set_threshold(50_000, 500, 500)
+
+
 def run() -> None:
     """The background watcher loop (foreground process; detached by `open`)."""
     cfg = config.load()
@@ -212,6 +222,7 @@ def run() -> None:
         log("another daemon is already running; exiting")
         return
     log(f"daemon start pid={__import__('os').getpid()} tick={cfg['daemon_tick_sec']}s")
+    _trim_memory()
     try:
         loop(cfg)
     except KeyboardInterrupt:
