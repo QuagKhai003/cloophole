@@ -1,5 +1,7 @@
 """runner + app-helper tests — process state logic without launching a tray."""
 
+import os
+
 import pytest
 
 
@@ -95,6 +97,24 @@ def test_spawn_no_console_but_window_shows(env, monkeypatch):
     # No SW_HIDE startupinfo, which would hide the GUI window itself (B10).
     si = captured.get("startupinfo")
     assert si is None or not (si.dwFlags & 0x00000001)  # STARTF_USESHOWWINDOW unset
+
+
+def test_spawn_strips_pyinstaller_env(env, monkeypatch):
+    """The onefile self-spawn must not pass PyInstaller's _MEIPASS2/_PYI_* to the
+    child, or the child attaches to the parent's _MEI temp (deleted on exit) and
+    the GUI window never appears. Regression for B11."""
+    runner, _ = env
+    monkeypatch.setenv("_MEIPASS2", "C:/Temp/_MEI123")
+    monkeypatch.setenv("_PYI_ARCHIVE_FILE", "x")
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))  # keep a normal var
+    captured = {}
+    monkeypatch.setattr(runner.subprocess, "Popen",
+                        lambda *a, **k: captured.update(k))
+    runner._spawn("_gui")
+    env_passed = captured["env"]
+    assert "_MEIPASS2" not in env_passed
+    assert not any(k.startswith("_PYI") for k in env_passed)
+    assert "PATH" in env_passed  # ordinary vars are preserved
 
 
 def test_gui_launch_skips_when_running(env, monkeypatch):
