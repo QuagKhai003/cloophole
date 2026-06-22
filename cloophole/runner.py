@@ -6,8 +6,9 @@
 @done     is_running()/pid()/launch()/stop() for the daemon; is_gui_running()/
           launch_gui() for the GUI window (both detached + single-instance).
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
-@limits   Windows-first; launch uses pythonw + DETACHED_PROCESS|CREATE_NO_WINDOW,
-          with stdio -> DEVNULL so the detached GUI child has valid handles.
+@limits   Windows-first; launch uses pythonw + CREATE_NO_WINDOW (no DETACHED_PROCESS,
+          which would un-hide the console) + SW_HIDE, stdio -> DEVNULL so the
+          windowless GUI child has valid handles and shows no blank terminal.
 @affects  Used by CLI open/close/uninstall. Process holds daemon.pid.
 """
 
@@ -20,7 +21,11 @@ from typing import Optional
 
 from .paths import gui_pid_file, pid_file
 
-DETACHED = 0x00000008 | 0x08000000  # DETACHED_PROCESS | CREATE_NO_WINDOW
+CREATE_NO_WINDOW = 0x08000000  # console app, no console window
+# NB: do NOT also pass DETACHED_PROCESS (0x8) — Win32 ignores CREATE_NO_WINDOW when
+# DETACHED_PROCESS is set, so the console-subsystem exe would get a visible console
+# window (the blank terminal behind the GUI). CREATE_NO_WINDOW alone gives the child
+# its own hidden console; it still outlives the parent (separate process).
 
 
 def _alive(pid: int | None) -> bool:
@@ -75,16 +80,21 @@ def _cmd(sub: str) -> list[str]:
 
 
 def _spawn(sub: str) -> None:
-    # Detach std handles too: with DETACHED_PROCESS the child has no console, so
-    # inherited stdout/stderr are invalid and the first write (e.g. Tk startup in
-    # the `_gui` child) crashes it. DEVNULL gives it valid, silent handles.
+    # Silence std handles: a windowless child has no usable console, so inherited
+    # stdout/stderr are invalid and the first write (e.g. Tk startup in the `_gui`
+    # child) would crash it. DEVNULL gives it valid, silent handles.
     kwargs = {
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,
         "stderr": subprocess.DEVNULL,
     }
     if sys.platform == "win32":
-        kwargs["creationflags"] = DETACHED
+        kwargs["creationflags"] = CREATE_NO_WINDOW
+        # Belt-and-suspenders: hide any window the child might create.
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0  # SW_HIDE
+        kwargs["startupinfo"] = si
     subprocess.Popen(_cmd(sub), close_fds=True, **kwargs)
 
 

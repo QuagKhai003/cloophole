@@ -35,6 +35,15 @@ in *all* live session dirs, and `cloophole dir` pins one — see ROADMAP backlog
 when no cwd is readable rather than firing blindly.
 
 ## Resolved
+- **B8 — blank console window behind the GUI; window too short (buttons clipped)**
+  (user-reported 2026-06-22, after B7). (a) `_spawn` passed
+  `DETACHED_PROCESS | CREATE_NO_WINDOW` together; Win32 *ignores* CREATE_NO_WINDOW
+  when DETACHED_PROCESS is set, so the console-subsystem exe got a visible blank
+  console (only seen once B7 let the GUI live). **Fix:** CREATE_NO_WINDOW alone (no
+  DETACHED) + STARTUPINFO SW_HIDE. (b) GUI window was 440x430 — the 6 action buttons
+  ran off-screen with no scroll. **Fix:** taller default + clamp to `winfo_reqheight`
+  so it always fits its content (DPI/font safe).
+  RESOLVED 2026-06-22 (`cloophole/runner.py`, `cloophole/gui.py`).
 - **B7 — `cloophole open` shows no window (detached GUI child crashes)**
   (user-reported 2026-06-22). `runner._spawn` launched the `_gui` child with
   `DETACHED_PROCESS` but no stdio redirection. A detached process has no console, so
