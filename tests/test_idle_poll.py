@@ -71,9 +71,10 @@ def test_probe_due_after_interval(env, monkeypatch):
     assert out.last_poll != old  # ran, stamp refreshed
 
 
-def test_auto_watch_on_by_default(env):
+def test_poll_off_by_default(env):
     _, _, config = env
-    assert config.load()["poll_enabled"] is True  # auto-watch on out of the box
+    # OFF out of the box: the probe spends quota each interval (B9). Opt in only.
+    assert config.load()["poll_enabled"] is False
 
 
 def test_fire_and_probe_share_limit_helper():

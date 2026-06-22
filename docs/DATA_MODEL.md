@@ -43,8 +43,8 @@ Persisted as `~/.cloophole/config.json`; missing keys fall back to `DEFAULTS`.
 | `claude_path` | `claude` | executable name / full path |
 | `permission_mode` | `acceptEdits` | non-interactive; headless can't confirm |
 | `daemon_tick_sec` | `15` | watcher loop cadence |
-| `poll_enabled` | `true` | auto-watch: idle probing to auto-detect the limit |
-| `poll_interval_min` | `30` | gentle — probing costs quota |
+| `poll_enabled` | `false` | OFF by default — idle probe spends quota each interval (B9); opt in or use the StopFailure hook |
+| `poll_interval_min` | `30` | gentle — probing still costs quota |
 | `fire_timeout_sec` | `1800` | cap one `--continue` run |
 | `claude_process_name` | `claude.exe` | name matched by the live gate |
 
