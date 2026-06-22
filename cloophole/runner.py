@@ -6,9 +6,10 @@
 @done     is_running()/pid()/launch()/stop() for the daemon; is_gui_running()/
           launch_gui() for the GUI window (both detached + single-instance).
 @todo     mac/Linux launch (P5, ADR-0003 follow-up).
-@limits   Windows-first; launch uses pythonw + CREATE_NO_WINDOW (no DETACHED_PROCESS,
-          which would un-hide the console) + SW_HIDE, stdio -> DEVNULL so the
-          windowless GUI child has valid handles and shows no blank terminal.
+@limits   Windows-first; launch uses pythonw + CREATE_NO_WINDOW only (NOT
+          DETACHED_PROCESS, which un-hides the console; NOT STARTUPINFO SW_HIDE,
+          which hides the GUI window too — B10), stdio -> DEVNULL so the child has
+          valid handles, no blank terminal, and the window still shows.
 @affects  Used by CLI open/close/uninstall. Process holds daemon.pid.
 """
 
@@ -89,12 +90,11 @@ def _spawn(sub: str) -> None:
         "stderr": subprocess.DEVNULL,
     }
     if sys.platform == "win32":
+        # CREATE_NO_WINDOW alone suppresses the console for this console-subsystem
+        # exe WITHOUT hiding the GUI's own window. Do NOT add STARTUPINFO SW_HIDE:
+        # that sets nCmdShow=SW_HIDE, which Tk applies to its first top-level window
+        # too, so the GUI opens hidden and never appears (B10).
         kwargs["creationflags"] = CREATE_NO_WINDOW
-        # Belt-and-suspenders: hide any window the child might create.
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        si.wShowWindow = 0  # SW_HIDE
-        kwargs["startupinfo"] = si
     subprocess.Popen(_cmd(sub), close_fds=True, **kwargs)
 
 
