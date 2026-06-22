@@ -3,9 +3,19 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (B11 — onefile self-spawn: no window + _MEI warning)
+**Last updated:** 2026-06-23 (ADR-0008 — zero-quota rate-limit hook; poll out of GUI)
 
 ## Active task
+**ADR-0008 — zero-quota limit auto-detect via Claude hook — DONE (branch
+`feat/limit-hook`), pending GUI-polish branch + CI build.** `claude_hook.py` registers
+a `StopFailure`/`rate_limit` hook that runs `cloophole limit-signal`; the daemon
+watches the signal file and arms WAITING (est. `limit_window_hours`, default 5) with
+the hook's `cwd` as a fire fallback (B6). `open` auto-registers + prints a notice;
+`uninstall`/`hook off` remove it. GUI's poll checkbox replaced by a hook on/off line.
+Poll stays opt-in via `cloophole poll on`. 36 tests. NEXT: GUI session list + window
+fit (branch `feat/gui-sessions-and-fit`), then one CI build for the user to verify.
+
+## (prior) Active task
 **B11 fix — `cloophole open` shows no window — DONE (branch
 `fix/onefile-self-spawn-env`), awaiting user verify.** The frozen exe spawning itself
 let the child inherit `_MEIPASS2`/`_PYI_*`, so it bound to the parent's `_MEI` temp

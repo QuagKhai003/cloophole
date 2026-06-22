@@ -26,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "poll_interval_min": 30,        # gentle, but probing still costs quota
     "fire_timeout_sec": 1800,       # cap a single --continue run
     "claude_process_name": "claude.exe",
+    "limit_window_hours": 5,        # est. reset window when the rate-limit hook fires
 }
 
 

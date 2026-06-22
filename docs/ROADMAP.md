@@ -81,6 +81,16 @@ Built (ADR-0006), then replaced by the desktop window. `menu.py` removed.
 | B2 | `install.ps1`/`uninstall.ps1` (irm \| iex) + PATH + frozen-aware launch | ✅ |
 | B3 | release CI builds + attaches the exe on tag | ✅ |
 
+## Phase H — Zero-quota limit hook — COMPLETE (ADR-0008)
+**Goal:** auto-detect the limit without spending quota; replace the idle poll as the
+default (poll stays opt-in). Supersedes ADR-0002 for everyday use.
+
+| # | Task | Status |
+|---|------|--------|
+| H1 | `claude_hook` — settings install/uninstall + signal read/write | ✅ |
+| H2 | daemon consumes the signal → WAITING (+ `hook_dir` fallback, B6) | ✅ |
+| H3 | CLI `limit-signal`/`hook`; `open` registers + notice; uninstall removes; GUI drops poll checkbox | ✅ |
+
 ## Phase 6 — Polish — PLANNED (ADR-0004)
 | # | Task | Status |
 |---|------|--------|

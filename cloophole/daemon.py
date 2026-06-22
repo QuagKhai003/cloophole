@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from . import config, fire, probe, state
+from . import claude_hook, config, fire, probe, state
 from .paths import log_file, pid_file
 
 
@@ -71,6 +71,8 @@ def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
         return [st.work_dir]
     if cwds:
         return list(cwds)
+    if st.hook_dir:  # no live cwd readable -> fall back to where the limit hit
+        return [st.hook_dir]
     return [None]
 
 
@@ -110,6 +112,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.last_error = None
         st.reset_at = None
         st.limit_text = None
+        st.hook_dir = None
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
@@ -122,6 +125,20 @@ def tick(cfg: dict) -> state.State:
     live, cwds = detect_sessions(cfg)
     st.live_session = live
     now = datetime.now(timezone.utc)
+
+    # Zero-quota auto-detect: Claude's StopFailure/rate_limit hook dropped a signal.
+    sig = claude_hook.read_signal()
+    if sig:
+        claude_hook.clear_signal()
+        if st.phase in (state.WATCHING, state.ARMED, state.FIRED, state.ERROR):
+            hours = cfg.get("limit_window_hours", 5)
+            st.reset_at = (now + timedelta(hours=hours)).isoformat()
+            st.limit_text = f"rate-limit hook @ {sig.get('ts')}"
+            st.hook_dir = sig.get("cwd")
+            st.phase = state.WAITING
+            log(f"rate-limit hook -> WAITING, est reset {st.reset_at}, dir={st.hook_dir}")
+            state.save(st)
+            return st
 
     if st.phase == state.WATCHING and _due_to_poll(st, cfg, now):
         st.last_poll = now.isoformat()
