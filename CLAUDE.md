@@ -19,12 +19,12 @@ gate is process detection; "what to resume" comes from the user's queue note, no
 from Claude's memory. If a feature needs to cross this line, stop and redesign.
 
 ## Tech stack
-- **Language:** Python 3.10+ (developed on 3.14).
-- **Tray app:** `pystray` + `Pillow` (the only runtime deps; imported lazily in
-  `app.py` so the rest stays importable without them). Text input via stdlib `tkinter`.
+- **Language:** Python 3.10+ (developed on 3.14). **Stdlib only, no runtime deps.**
+- **UI:** an interactive terminal menu (`menu.py`) — no web, no tray, no GUI toolkit.
 - **Windows process/cwd detection:** `ctypes` reading the target PEB (no psutil).
-- **UI/dashboard:** stdlib `http.server` — one self-refreshing page, no JS framework.
-- **No run-at-logon:** the app is started explicitly with `cloophole open` (ADR-0003).
+- **Background watcher:** a detached, hidden, single-instance daemon process.
+- **No run-at-logon:** started explicitly with `cloophole open` (ADR-0003/0006).
+- **Packaging:** PyInstaller onefile `cloophole.exe` + `install.ps1` (ADR-0005).
 - **Tests:** `pytest` (dev-only).
 - **Secrets:** none. State/config/logs live in `~/.cloophole/` (override
   `$CLOOPHOLE_HOME`); never committed.
@@ -41,12 +41,13 @@ cloophole/        # the package — one module per responsibility
   probe.py        #   idle quota probe
   subproc.py      #   no-window subprocess wrapper
   daemon.py       #   watcher loop + transitions (claim_pid/loop/run)
-  ui.py           #   dashboard page + /state JSON (start_background)
-  app.py          #   system-tray app (pystray) — the desktop face
-  runner.py       #   launch/attach/stop the background app (open/close)
+  menu.py         #   interactive terminal menu (the UI)
+  runner.py       #   launch/attach/stop the background daemon (open/close)
   install_win.py  #   LEGACY autostart cleanup (uninstall only)
   __main__.py     #   CLI dispatch
-tests/            # pytest (parser, state machine, idle poll, ui, runner/app)
+packaging/        # PyInstaller entry.py + cloophole.spec -> cloophole.exe
+install.ps1 / uninstall.ps1     # one-line PowerShell installer (irm | iex)
+tests/            # pytest (parser, state machine, idle poll, runner/menu)
 docs/             # living documentation — read these, keep them updated
 claude-resume-product-plan.md   # the product vision
 README.md                       # user-facing readme
@@ -54,23 +55,23 @@ README.md                       # user-facing readme
 
 ## How to run
 ```bash
-pip install -e .            # first time: installs the `cloophole` command + deps
-cloophole open              # launch the tray app (background)
-cloophole close             # stop it
-python -m cloophole daemon  # headless watcher (no tray), foreground
-python -m cloophole status  # inspect state
+pip install -e .            # first time: installs the `cloophole` command (stdlib)
+cloophole open              # start background daemon + open the terminal menu
+cloophole menu              # just the menu
+cloophole close             # stop the daemon
+python -m cloophole daemon  # run the watcher in the foreground
 python -m pytest -q         # fast/offline suite
 ```
 
 ## Current state (read docs/STATUS.md for live detail)
 - **Done & working:** engine + state machine, reset parser, Windows process/cwd
   detection (verified vs real `claude.exe`), `--continue` fire in **all** live session
-  dirs (or a pinned one) hidden, idle quota poll, **system-tray app** (`open`/`close`,
-  single-instance, toast on fire, menu + dashboard), full CLI.
+  dirs (or a pinned one) hidden, idle quota poll, **interactive terminal menu** +
+  single-instance background daemon (`open`/`menu`/`close`), standalone exe + one-line
+  installer, full CLI.
 - **In flight:** none — pick the next ADR.
-- **Next direction:** cross-platform mac/Linux tray + detection (Phase 5); `.exe`
-  bundle (PyInstaller); Phase 6 polish.
-- **Tests:** 26 passing — `python -m pytest -q`.
+- **Next direction:** cross-platform mac/Linux detection (Phase 5); Phase 6 polish.
+- **Tests:** 25 passing — `python -m pytest -q`.
 
 ## New here?
 Start at `docs/ONBOARDING.md`. `docs/CONVENTIONS.md` is the mandatory hygiene contract.

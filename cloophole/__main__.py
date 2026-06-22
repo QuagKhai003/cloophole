@@ -1,15 +1,16 @@
-"""cloophole CLI — control surface for the tray app + state file.
+"""cloophole CLI — terminal menu + background watcher control.
 
-@context  The human entry point. `open`/`close` run the background tray app;
-          the rest report limits, queue work, and inspect state on disk.
-@done     open/close/status/report/arm/queue/dir/clear/fire-now/poll/config/
-          daemon/ui/uninstall + internal _app; main() arg dispatch.
+@context  The human entry point. `open` starts the background daemon and opens
+          the terminal menu; the rest report limits, queue work, inspect state.
+@done     open/menu/close/status/report/arm/queue/dir/clear/fire-now/poll/config/
+          daemon/uninstall; main() arg dispatch.
 @todo     —
-@limits   open/close/uninstall are Windows-first (tray via pystray/Pillow).
-@affects  Reads/writes state + config; calls runner, app, daemon, ui, fire.
+@limits   open/close/uninstall are Windows-first.
+@affects  Reads/writes state + config; calls runner, menu, daemon, fire.
 
-  cloophole open                   launch the tray app (or attach if running)
-  cloophole close                  stop the background app
+  cloophole open                   start the daemon + open the terminal menu
+  cloophole menu                   open the terminal menu
+  cloophole close                  stop the background daemon
   cloophole status                 show state + countdown
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
   cloophole queue "<note>"         set what to continue
@@ -19,8 +20,7 @@
   cloophole arm <when>             manually arm: "5:30 PM" / "in 2h" / ISO
   cloophole clear                  back to WATCHING, drop reset/limit
   cloophole config [key [value]]   show / get / set config
-  cloophole ui [port]              serve the dashboard in the foreground
-  cloophole daemon                 run the watcher headless (no tray)
+  cloophole daemon                 run the watcher in the foreground
   cloophole uninstall              stop everything + remove app data
 """
 
@@ -29,7 +29,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 
-from . import config, daemon, fire, state, ui
+from . import config, daemon, fire, state
 from .reset_parser import parse_reset
 
 
@@ -46,17 +46,17 @@ def _fmt_countdown(st: state.State) -> str:
 
 
 def cmd_status(_args: list[str]) -> int:
+    from . import runner
     st = state.load()
+    print(f"daemon       {'running' if runner.is_running() else 'stopped'}")
     print(f"phase        {st.phase}")
     print(f"reset_at     {st.reset_at or '-'}{_fmt_countdown(st)}")
     print(f"live session {'yes' if st.live_session else 'no'}")
-    print(f"work_dir     {st.work_dir or '(claude cwd)'}")
+    print(f"work_dir     {st.work_dir or '(all live sessions)'}")
     print(f"queued       {st.queue_note or '(fallback)'}")
     print(f"last_fired   {st.last_fired or 'never'}")
     if st.last_error:
         print(f"last_error   {st.last_error}")
-    if config.get("ui_enabled"):
-        print(f"ui           http://127.0.0.1:{config.get('ui_port')}")
     return 0
 
 
@@ -173,28 +173,25 @@ def cmd_daemon(_args: list[str]) -> int:
     return 0
 
 
-def cmd_ui(args: list[str]) -> int:
-    port = int(args[0]) if args else None
-    ui.serve(port)
+def cmd_open(_args: list[str]) -> int:
+    """Ensure the background daemon is running, then open the terminal menu."""
+    from . import menu, runner
+    if not runner.is_running():
+        runner.launch()
+        print("cloophole daemon started in the background.")
+    menu.run()
     return 0
 
 
-def cmd_open(_args: list[str]) -> int:
-    """Launch the tray app, or attach to the one already running."""
-    from . import runner
-    if runner.is_running():
-        print("cloophole is already running - see the tray icon (right-click for menu).")
-        cmd_status([])
-        return 0
-    runner.launch()
-    print("cloophole started in the background.")
-    print("Look for the tray icon near the clock - right-click it for the menu.")
-    print(f"Dashboard: http://127.0.0.1:{config.get('ui_port')}")
+def cmd_menu(_args: list[str]) -> int:
+    """Open the terminal menu (does not auto-start the daemon)."""
+    from . import menu
+    menu.run()
     return 0
 
 
 def cmd_close(_args: list[str]) -> int:
-    """Stop the background app."""
+    """Stop the background daemon."""
     from . import runner
     if runner.stop():
         print("cloophole stopped.")
@@ -265,15 +262,9 @@ def _self_remove_exe() -> None:
     print("done.")
 
 
-def cmd_app(_args: list[str]) -> int:
-    """Internal: run the tray app in the foreground (launched detached by `open`)."""
-    from . import app
-    app.run()
-    return 0
-
-
 COMMANDS = {
     "open": cmd_open,
+    "menu": cmd_menu,
     "close": cmd_close,
     "status": cmd_status,
     "report": cmd_report,
@@ -285,9 +276,7 @@ COMMANDS = {
     "poll": cmd_poll,
     "config": cmd_config,
     "daemon": cmd_daemon,
-    "ui": cmd_ui,
     "uninstall": cmd_uninstall,
-    "_app": cmd_app,  # internal entry point for the detached tray process
 }
 
 

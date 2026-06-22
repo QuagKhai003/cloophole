@@ -5,23 +5,15 @@
 # Console exe: normal CLI commands print to the terminal; the detached tray
 # (`_app`) is launched with CREATE_NO_WINDOW so it shows no console.
 
-from PyInstaller.utils.hooks import collect_submodules
-
-hiddenimports = (
-    collect_submodules("pystray")
-    + collect_submodules("PIL")
-    + ["tkinter", "tkinter.simpledialog"]
-)
-
 a = Analysis(
     ["entry.py"],
     pathex=[".."],
     binaries=[],
     datas=[],
-    hiddenimports=hiddenimports,
+    hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=["numpy", "pytest"],
+    excludes=["numpy", "pytest", "pystray", "PIL", "tkinter"],
     noarchive=False,
 )
 

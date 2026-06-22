@@ -21,8 +21,6 @@ DEFAULTS: dict[str, Any] = {
     "daemon_tick_sec": 15,          # main loop cadence
     "poll_enabled": False,          # Phase 3 idle probing; off by default
     "poll_interval_min": 30,        # gentle, probing costs quota
-    "ui_enabled": True,             # daemon serves the status page itself
-    "ui_port": 8787,
     "fire_timeout_sec": 1800,       # cap a single --continue run
     "claude_process_name": "claude.exe",
 }

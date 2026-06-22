@@ -3,23 +3,24 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-22 (standalone .exe + `irm|iex` installer — ADR-0005)
+**Last updated:** 2026-06-22 (terminal-menu UI — ADR-0006; dropped web dashboard + tray)
 
 ## Phase
-Phases 1–4 + **A (tray app, ADR-0003)** + **B (distribution, ADR-0005)** are
-**COMPLETE** on Windows. Install is now one PowerShell line (`irm …/install.ps1 | iex`,
-no Python/pip) → `cloophole open`. 26 tests green. Next: cross-platform (mac/Linux),
-then Phase 6 polish.
+Phases 1–4 + **A (app lifecycle)** + **B (distribution)** + **C (terminal menu UI,
+ADR-0006)** are **COMPLETE** on Windows. UI is now a terminal menu (`cloophole open`)
+— web dashboard + tray removed, back to **zero runtime deps**. 25 tests green. Next:
+cross-platform (mac/Linux detection), then Phase 6 polish.
+Branch: feature work now on per-feature branches (e.g. `feat/terminal-menu`).
 
 ## Active task
-**Phase A — desktop tray app (ADR-0003) — DONE.**
-New `app.py` (pystray tray: menu, dynamic icon/title, toast on fire, tkinter queue
-dialog) + `runner.py` (`open`=launch-or-attach, `close`=stop). `daemon` refactored to
-`claim_pid`/`loop`/`start_ui` so the tray runs the watcher in a thread. CLI reworked to
-`open`/`close`/`uninstall` (+ internal `_app`); logon `install`/`start`/`stop` removed;
-`install_win.py` demoted to legacy cleanup. Deps added: pystray, Pillow. 26 tests green;
-full open→attach→close lifecycle verified live.
-**NEXT:** cross-platform tray/detection, or PyInstaller `.exe`, or Phase 6 polish.
+**Phase C — terminal menu UI (ADR-0006) — DONE (branch `feat/terminal-menu`).**
+Replaced the web dashboard + tray with `menu.py` (stdlib terminal menu: status header
++ fire/queue/report/poll/dir/clear/stop actions). Removed `ui.py`, `app.py`, the
+`pystray`/`Pillow` deps, `tkinter`, and the `ui_enabled`/`ui_port` config + daemon UI
+hookup → back to zero runtime deps. `runner.launch` now starts the background watcher
+daemon; CLI is `open` (daemon + menu) / `menu` / `close`. 25 tests green; menu render +
+detached-daemon lifecycle verified live. **Pending:** merge `feat/terminal-menu` → main.
+**NEXT:** cross-platform detection (mac/Linux), or Phase 6 polish.
 
 ## Next action (whoever picks this up)
 - **Before the `irm` one-liner works:** repo set to `QuagKhai003/cloophole` in
