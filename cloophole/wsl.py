@@ -45,26 +45,40 @@ def available() -> bool:
     return bool(p and p.returncode == 0)
 
 
-def claude_sessions() -> List[Tuple[str, str]]:
-    """[(pane_id, cwd)] for every tmux pane running claude in the default distro."""
-    fmt = f"#{{pane_id}}{_SEP}#{{pane_current_command}}{_SEP}#{{pane_current_path}}"
+def claude_sessions() -> List[Tuple[str, str, str]]:
+    """[(pane_id, cwd, where)] for every tmux pane running claude. `where` is a
+    human marker like 'w0.p2' (window.pane index) you can match with `prefix + q`."""
+    fmt = (f"#{{pane_id}}{_SEP}#{{pane_current_command}}{_SEP}#{{pane_current_path}}"
+           f"{_SEP}#{{window_index}}{_SEP}#{{pane_index}}")
     p = _wsl(["tmux", "list-panes", "-a", "-F", fmt])
     if not p or p.returncode != 0 or not p.stdout:
         return []
-    out: List[Tuple[str, str]] = []
+    out: List[Tuple[str, str, str]] = []
     for line in p.stdout.splitlines():
         parts = line.split(_SEP)
-        if len(parts) != 3:
+        if len(parts) != 5:
             continue
-        pane, cmd, path = (x.strip() for x in parts)
+        pane, cmd, path, win, idx = (x.strip() for x in parts)
         if pane and _IS_CLAUDE.match(cmd):
-            out.append((pane, path))
+            out.append((pane, path, f"w{win}.p{idx}"))
     return out
 
 
-def _claude_cwds() -> List[str]:
-    """Distinct cwds of claude processes in the default WSL distro (any shell)."""
+def highlight(pane_id: str) -> bool:
+    """Make `pane_id` the active tmux pane and flash the pane numbers, so the user
+    can SEE which split is which. Best-effort."""
+    if not pane_id:
+        return False
+    _wsl(["tmux", "select-pane", "-t", pane_id])
+    _wsl(["tmux", "display-panes", "-d", "1500"])
+    return True
+
+
+def _plain_claude_cwds() -> List[str]:
+    """Distinct cwds of claude processes NOT under tmux. tmux sets the TMUX env var in
+    its panes, so its absence in /proc/<pid>/environ means a plain shell."""
     script = ("for p in $(pgrep -f claude 2>/dev/null); do "
+              "grep -qz 'TMUX=' /proc/$p/environ 2>/dev/null || "
               "readlink /proc/$p/cwd 2>/dev/null; done")
     p = _wsl(["bash", "-lc", script])
     if not p or p.returncode != 0 or not p.stdout:
@@ -82,13 +96,8 @@ def plain_sessions() -> List[Tuple[int, str]]:
 
     Each interactive `wsl` is a root wsl.exe (parent isn't wsl.exe) hosting a Windows
     console; injecting into that console (via inject.send_text) reaches the WSL claude.
-    Best-effort: pairs claude cwds to root wsl.exe terminals; tmux panes are excluded
-    (they're handled by claude_sessions/send_keys)."""
-    cwds = _claude_cwds()
-    if not cwds:
-        return []
-    tmux_paths = {path for _pane, path in claude_sessions()}
-    plain = [c for c in cwds if c not in tmux_paths]
+    'Plain' = claude with no TMUX env var, so tmux panes never appear here."""
+    plain = _plain_claude_cwds()
     if not plain:
         return []
     from . import winproc
