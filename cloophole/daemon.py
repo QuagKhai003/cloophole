@@ -100,7 +100,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         # re-check probes already confirmed the reset, so we don't need headless
         # still_limited detection here.
         for d in dirs:
-            err = fire.resume(d, st.queue_note, cfg)
+            err = fire.resume(d, state.note_for(st, d), cfg)
             if err:
                 last_error = err
                 log(f"  ERROR in {d or '(cwd)'}: {err}")
@@ -109,7 +109,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
                 log(f"  resumed ({mode}) {d or '(cwd)'}")
     else:
         for d in dirs:
-            res = fire.fire(d, st.queue_note, cfg)
+            res = fire.fire(d, state.note_for(st, d), cfg)
             if res.error:
                 last_error = res.error
                 log(f"  ERROR in {d or '(cwd)'}: {res.error}")

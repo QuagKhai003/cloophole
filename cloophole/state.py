@@ -52,6 +52,8 @@ class State:
     live_session: bool = False            # last observed
     live_dirs: list = field(default_factory=list)  # cwds of every live session (display)
     excluded_dirs: list = field(default_factory=list)  # sessions the user un-ticked (skip on fire)
+    note_mode: str = "bulk"               # "bulk" (one note for all) | "per" (per-session)
+    session_notes: dict = field(default_factory=dict)  # dir -> its own message (per mode)
     updated_at: str = field(default_factory=_now_iso)
 
     def reset_dt(self) -> Optional[datetime]:
@@ -61,6 +63,16 @@ class State:
             return datetime.fromisoformat(self.reset_at)
         except ValueError:
             return None
+
+
+def note_for(st: "State", work_dir: Optional[str]) -> Optional[str]:
+    """The message to send to `work_dir`: its per-session note in 'per' mode (falling
+    back to the bulk note), else the shared bulk note."""
+    if st.note_mode == "per" and work_dir:
+        n = (st.session_notes or {}).get(work_dir)
+        if n and n.strip():
+            return n
+    return st.queue_note
 
 
 def load() -> State:
