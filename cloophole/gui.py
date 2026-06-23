@@ -305,6 +305,24 @@ def run() -> None:
         ticked = sum(1 for k in keys if k not in ex)
         v_sesscount.config(text=f"({ticked} of {len(keys)} ticked)" if keys else "")
 
+    def _focus_session(sess: dict) -> None:
+        # Bring the session's terminal window to the front. tmux: flash the pane too
+        # (its Windows host terminal isn't tracked, so we at least highlight the pane).
+        kind, handle = sess.get("kind"), sess.get("handle")
+
+        def work():
+            try:
+                if kind == "wsl":
+                    from . import wsl
+                    wsl.highlight(handle)
+                else:
+                    from . import inject
+                    inject.focus(int(handle))
+            except Exception:
+                pass
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _autosize() -> None:
         # Grow the window to show every detected session, up to the laptop's screen
         # height; beyond that the list scrolls (scrollregion is always live, so the
@@ -361,15 +379,15 @@ def run() -> None:
             head.pack(anchor="w", fill="x")
             fl = lbl(head, s["folder"], FG, ("Segoe UI", 9, "bold"), bg=PANEL2)
             fl.pack(side="left")
-            if s.get("kind") == "wsl":  # click the name to flash that tmux pane
-                fl.config(cursor="hand2")
-                fl.bind("<Button-1>", lambda _e, h=s["handle"]:
-                        threading.Thread(target=lambda: __import__(
-                            "cloophole.wsl", fromlist=["highlight"]).highlight(h),
-                            daemon=True).start())
             if s.get("label"):
                 lbl(head, f"  ·  {s['label']}", ACCENT, ("Segoe UI", 7), bg=PANEL2).pack(side="left")
-            lbl(txt, s.get("path", key), SUB, ("Segoe UI", 7), bg=PANEL2).pack(anchor="w")
+            pl = lbl(txt, s.get("path", key), SUB, ("Segoe UI", 7), bg=PANEL2)
+            pl.pack(anchor="w")
+            # Click the row (name/path) to bring that terminal to the front; a tmux
+            # pane also flashes so you see which split it is.
+            for w in (fl, pl, head, txt):
+                w.config(cursor="hand2")
+                w.bind("<Button-1>", lambda _e, ss=s: _focus_session(ss))
             if st.note_mode == "per":
                 svar = tk.StringVar(value=(st.session_notes or {}).get(key, ""))
 
