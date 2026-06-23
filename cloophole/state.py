@@ -96,3 +96,28 @@ def save(st: State) -> None:
     tmp = f.with_name(f.name + ".tmp")
     tmp.write_text(json.dumps(asdict(st), indent=2), encoding="utf-8")
     os.replace(tmp, f)
+
+
+# The GUI owns the user's intent; the daemon owns runtime. They write the SAME file,
+# so each must preserve the other's fields (re-read just before saving) — otherwise a
+# daemon tick clobbers the user's note_mode/excluded_dirs and vice-versa (the race that
+# made unticked sessions still fire and messages fall back).
+_USER_FIELDS = ("queue_note", "work_dir", "excluded_dirs", "note_mode", "session_notes")
+_RUNTIME_FIELDS = ("phase", "reset_at", "limit_text", "last_fired", "last_error",
+                   "last_poll", "hook_dir", "recheck_at", "live_session", "live_dirs")
+
+
+def save_user(st: State) -> None:
+    """GUI save: write the user fields, keep the daemon's latest runtime fields."""
+    cur = load()
+    for f in _RUNTIME_FIELDS:
+        setattr(st, f, getattr(cur, f))
+    save(st)
+
+
+def save_runtime(st: State) -> None:
+    """Daemon save: write runtime fields, keep the user's latest intent fields."""
+    cur = load()
+    for f in _USER_FIELDS:
+        setattr(st, f, getattr(cur, f))
+    save(st)
