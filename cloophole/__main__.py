@@ -41,6 +41,7 @@ USAGE = """cloophole — auto-resume Claude Code after the usage limit resets.
   cloophole open                   start the watcher + open the app window
   cloophole close                  stop the watcher + close the window
   cloophole status                 show state + countdown
+  cloophole version                show the build id (verify you have the latest exe)
   cloophole sessions               list live Claude sessions (folder + terminal)
   cloophole send "<text>"          type text into every live Claude session
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
@@ -67,6 +68,15 @@ def _fmt_countdown(st: state.State) -> str:
     h, rem = divmod(secs, 3600)
     m, _ = divmod(rem, 60)
     return f"  (in {h}h {m:02d}m)" if h else f"  (in {m}m)"
+
+
+def cmd_version(_args: list[str]) -> int:
+    try:
+        from ._build import BUILD
+    except Exception:
+        BUILD = "dev"
+    print(f"cloophole build {BUILD}")
+    return 0
 
 
 def cmd_status(_args: list[str]) -> int:
@@ -426,6 +436,7 @@ COMMANDS = {
     "hook": cmd_hook,
     "close": cmd_close,
     "status": cmd_status,
+    "version": cmd_version,
     "sessions": cmd_sessions,
     "send": cmd_send,
     "report": cmd_report,
