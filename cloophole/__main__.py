@@ -365,11 +365,15 @@ def cmd_uninstall(_args: list[str]) -> int:
             install_win._uninstall_task(quiet=True)
         except Exception:
             pass
-    try:
-        shutil.rmtree(home())
-        print(f"removed app data ({home()}).")
-    except OSError as e:
-        print(f"note: could not remove app data: {e}")
+    from pathlib import Path
+    for d in {home(), Path.home() / ".cloophole"}:  # new + legacy homes
+        try:
+            shutil.rmtree(d)
+            print(f"removed app data ({d}).")
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            print(f"note: could not remove {d}: {e}")
 
     if getattr(sys, "frozen", False):
         _self_remove_exe()
