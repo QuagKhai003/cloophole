@@ -161,7 +161,7 @@ def run() -> None:
     def save_note(*_):
         st = state.load()
         st.queue_note = note_var.get().strip() or None
-        state.save(st)
+        state.save_user(st)
 
     note_var.trace_add("write", save_note)  # save on every keystroke, not just focus-out
     note_box = card(root)
@@ -186,7 +186,7 @@ def run() -> None:
     def _toggle_note_mode(*_):
         st = state.load()
         st.note_mode = "bulk" if st.note_mode == "per" else "per"
-        state.save(st)
+        state.save_user(st)
         _apply_note_mode()
 
     mode_btn.bind("<Button-1>", _toggle_note_mode)
@@ -239,7 +239,7 @@ def run() -> None:
         st = state.load()
         dirs = list(st.live_dirs or [])
         st.excluded_dirs = [] if ticked else list(dirs)
-        state.save(st)
+        state.save_user(st)
         _render_sessions(force=True)
 
     allbtn = tk.Label(sess_head, text="all", fg=ACCENT, bg=BG,
@@ -272,7 +272,7 @@ def run() -> None:
         ex = set(st.excluded_dirs or [])
         ex.discard(d) if var.get() else ex.add(d)
         st.excluded_dirs = sorted(ex)
-        state.save(st)
+        state.save_user(st)
         _update_count()
 
     # Per-folder stickiness: each detected folder lingers for _STICKY refreshes after
@@ -348,7 +348,7 @@ def run() -> None:
                     else:
                         notes.pop(dd, None)
                     s.session_notes = notes
-                    state.save(s)
+                    state.save_user(s)
 
                 svar.trace_add("write", lambda *_a, f=_save_sess_note: f())
                 e = tk.Entry(txt, textvariable=svar, bg=PANEL, fg=FG, insertbackground=FG,
@@ -398,7 +398,7 @@ def run() -> None:
             st.reset_at = dt.isoformat()
             st.limit_text = text
             st.phase = state.WAITING
-            state.save(st)
+            state.save_runtime(st)
             messagebox.showinfo(
                 "cloophole",
                 f"Got it — will resume after {dt.astimezone():%I:%M %p on %b %d}.")
@@ -412,7 +412,7 @@ def run() -> None:
             title="Pin one folder to resume in (Cancel = use the ticked sessions)")
         st = state.load()
         st.work_dir = d or None
-        state.save(st)
+        state.save_user(st)
 
     def reset_status():
         st = state.load()
@@ -420,7 +420,7 @@ def run() -> None:
         st.reset_at = None
         st.limit_text = None
         st.last_error = None
-        state.save(st)
+        state.save_runtime(st)
 
     def stop_watcher():
         if messagebox.askyesno("cloophole", "Stop watching and close cloophole?"):

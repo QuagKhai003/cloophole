@@ -85,10 +85,10 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
     dirs = _fire_dirs(st, cwds)
     if not dirs:  # user un-ticked every detected session -> nothing to resume
         log("no selected sessions to fire (all un-ticked); staying put")
-        state.save(st)
+        state.save_runtime(st)
         return
     st.phase = state.FIRING
-    state.save(st)
+    state.save_runtime(st)
     log(f"FIRING in {len(dirs)} dir(s): {dirs} note={st.queue_note!r}")
 
     last_error = None
@@ -127,7 +127,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.reset_at = dt.isoformat() if dt else st.reset_at
         st.phase = state.WAITING
         log(f"re-armed for {st.reset_at}")
-        state.save(st)
+        state.save_runtime(st)
         return
 
     if fired_ok:
@@ -140,7 +140,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
-    state.save(st)
+    state.save_runtime(st)
 
 
 def tick(cfg: dict) -> state.State:
@@ -174,7 +174,7 @@ def tick(cfg: dict) -> state.State:
             st.recheck_at = sorted(t.isoformat() for t in (after, before) if t > now)
             log(f"rate-limit hook -> WAITING, est reset {st.reset_at}, dir={st.hook_dir}, "
                 f"rechecks={st.recheck_at}")
-            state.save(st)
+            state.save_runtime(st)
             return st
 
     if st.phase == state.WATCHING and _due_to_poll(st, cfg, now):
@@ -187,7 +187,7 @@ def tick(cfg: dict) -> state.State:
             st.limit_text = text
             st.phase = state.WAITING
             log(f"idle probe: limited -> WAITING, reset {st.reset_at}")
-        state.save(st)
+        state.save_runtime(st)
         return st
 
     if st.phase == state.WAITING:
@@ -209,7 +209,7 @@ def tick(cfg: dict) -> state.State:
                     if dt:
                         st.reset_at = dt.isoformat()  # refine the estimate
                     log(f"recheck: still limited (reset ~{st.reset_at})")
-                    state.save(st)
+                    state.save_runtime(st)
                     return st
         rst = st.reset_dt()
         if rst and now >= rst:
@@ -225,7 +225,7 @@ def tick(cfg: dict) -> state.State:
             _do_fire(st, cfg, cwds)
             return state.load()
 
-    state.save(st)
+    state.save_runtime(st)
     return st
 
 

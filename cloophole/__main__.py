@@ -100,7 +100,7 @@ def cmd_report(args: list[str]) -> int:
     st.reset_at = dt.isoformat()
     st.limit_text = text
     st.phase = state.WAITING
-    state.save(st)
+    state.save_runtime(st)
     print(f"armed -> WAITING, reset at {dt.astimezone().strftime('%Y-%m-%d %H:%M %Z')}")
     return 0
 
@@ -115,7 +115,7 @@ def cmd_queue(args: list[str]) -> int:
         print(st.queue_note or "(none)")
         return 0
     st.queue_note = " ".join(args)
-    state.save(st)
+    state.save_user(st)
     print(f"queued: {st.queue_note}")
     return 0
 
@@ -191,7 +191,7 @@ def cmd_dir(args: list[str]) -> int:
         print(st.work_dir or "(claude cwd)")
         return 0
     st.work_dir = args[0]
-    state.save(st)
+    state.save_user(st)
     print(f"work_dir: {st.work_dir}")
     return 0
 
@@ -202,7 +202,7 @@ def cmd_clear(_args: list[str]) -> int:
     st.reset_at = None
     st.limit_text = None
     st.last_error = None
-    state.save(st)
+    state.save_runtime(st)
     print("cleared -> WATCHING")
     return 0
 
@@ -222,7 +222,7 @@ def cmd_fire_now(_args: list[str]) -> int:
         st.last_fired = datetime.now(timezone.utc).isoformat()
         st.phase = state.WATCHING
         st.reset_at = None
-        state.save(st)
+        state.save_runtime(st)
     return 0 if res.ok else 1
 
 
