@@ -429,10 +429,12 @@ def cmd_wsl_debug(_args: list[str]) -> int:
     wsls = [(pid, named.get(ppid, (0, ""))[1])
             for pid, (ppid, name) in named.items() if (name or "").lower() == "wsl.exe"]
     print("wsl.exe (pid,parent):", wsls)
-    p = wsl._wsl(["bash", "-c",
-                  "for p in $(pgrep -f claude 2>/dev/null); do echo \"$p "
-                  "tmux=$(grep -qz TMUX= /proc/$p/environ && echo Y || echo N) "
-                  "cwd=$(readlink /proc/$p/cwd)\"; done"], timeout=15)
+    import base64
+    sc = ("for p in $(pgrep -f claude 2>/dev/null); do echo \"$p "
+          "tmux=$(grep -qz TMUX= /proc/$p/environ && echo Y || echo N) "
+          "cwd=$(readlink /proc/$p/cwd)\"; done")
+    b64 = base64.b64encode(sc.encode()).decode()
+    p = wsl._wsl(["bash", "-c", f"echo {b64} | base64 -d | bash"], timeout=15)
     print("raw rc :", None if not p else p.returncode)
     print("raw out:", None if not p else repr(p.stdout))
     print("raw err:", None if not p else repr(p.stderr))

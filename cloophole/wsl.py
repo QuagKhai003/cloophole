@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import base64
 import re
 import sys
 from typing import List, Tuple
@@ -82,9 +83,11 @@ def _plain_claude_cwds() -> List[str]:
     script = ("for p in $(pgrep -f claude 2>/dev/null); do "
               "grep -qz 'TMUX=' /proc/$p/environ 2>/dev/null || "
               "readlink /proc/$p/cwd 2>/dev/null; done")
-    # bash -c (NOT -lc): a login shell sources the user's profile (nvm/node etc.)
-    # which can take >10s and time us out. pgrep/readlink need no login env.
-    p = _wsl(["bash", "-c", script], timeout=15)
+    # The script's $(...) / $p get mangled crossing Windows -> wsl.exe -> bash (the
+    # outer layer expands them). base64 the script so the OUTER command has no shell
+    # metachars; decode + run it inside WSL where bash evaluates it cleanly.
+    b64 = base64.b64encode(script.encode()).decode()
+    p = _wsl(["bash", "-c", f"echo {b64} | base64 -d | bash"], timeout=15)
     if not p or p.returncode != 0 or not p.stdout:
         return []
     seen: List[str] = []
