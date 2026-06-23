@@ -5,7 +5,9 @@
           so we detect/inject via tmux: `wsl tmux list-panes` to find claude panes,
           `wsl tmux send-keys -t <pane>` to type into a specific pane (exact, no focus
           games). Still public-CLI only (Golden Rule, ADR-0012 action side).
-@done     claude_sessions() -> [(pane_id, cwd)]; send_keys(pane_id, text).
+@done     claude_sessions() -> [(pane_id, cwd)] (tmux) + send_keys(pane, text);
+          plain_sessions() -> [(windows_wsl_host_pid, cwd)] (non-tmux), injected via
+          the host console (fire.resume -> inject.send_text on that pid).
 @todo     non-default WSL distro / custom tmux socket selection.
 @limits   Windows-only host; needs WSL + a running tmux. Best-effort: any failure
           returns [] / False. A pane's command shows as `claude` or its version
@@ -57,6 +59,48 @@ def claude_sessions() -> List[Tuple[str, str]]:
         pane, cmd, path = (x.strip() for x in parts)
         if pane and _IS_CLAUDE.match(cmd):
             out.append((pane, path))
+    return out
+
+
+def _claude_cwds() -> List[str]:
+    """Distinct cwds of claude processes in the default WSL distro (any shell)."""
+    script = ("for p in $(pgrep -f claude 2>/dev/null); do "
+              "readlink /proc/$p/cwd 2>/dev/null; done")
+    p = _wsl(["bash", "-lc", script])
+    if not p or p.returncode != 0 or not p.stdout:
+        return []
+    seen: List[str] = []
+    for c in p.stdout.splitlines():
+        c = c.strip()
+        if c and c not in seen:
+            seen.append(c)
+    return seen
+
+
+def plain_sessions() -> List[Tuple[int, str]]:
+    """Plain (non-tmux) WSL claude sessions -> [(windows_wsl_host_pid, cwd)].
+
+    Each interactive `wsl` is a root wsl.exe (parent isn't wsl.exe) hosting a Windows
+    console; injecting into that console (via inject.send_text) reaches the WSL claude.
+    Best-effort: pairs claude cwds to root wsl.exe terminals; tmux panes are excluded
+    (they're handled by claude_sessions/send_keys)."""
+    cwds = _claude_cwds()
+    if not cwds:
+        return []
+    tmux_paths = {path for _pane, path in claude_sessions()}
+    plain = [c for c in cwds if c not in tmux_paths]
+    if not plain:
+        return []
+    from . import winproc
+    named = winproc.all_procs_named()
+    roots = [pid for pid, (ppid, name) in named.items()
+             if (name or "").lower() == "wsl.exe"
+             and (named.get(ppid, (0, ""))[1] or "").lower() != "wsl.exe"]
+    out: List[Tuple[int, str]] = []
+    for i, cwd in enumerate(plain):
+        pid = roots[i] if i < len(roots) else (roots[0] if roots else None)
+        if pid:
+            out.append((pid, cwd))
     return out
 
 

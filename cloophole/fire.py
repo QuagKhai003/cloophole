@@ -92,6 +92,14 @@ def resume(target: Optional[str], queue_note: Optional[str],
         from . import wsl
         text = (queue_note or "").strip() or FALLBACK_NOTE
         return None if wsl.send_keys(str(target)[4:], text) else "couldn't reach the WSL pane"
+    if target and str(target).startswith("wslp:"):  # plain WSL: inject via host console
+        from . import inject
+        text = (queue_note or "").strip() or FALLBACK_NOTE
+        try:
+            pid = int(str(target)[5:])
+        except ValueError:
+            return "bad WSL target"
+        return None if inject.send_text(pid, text) else "couldn't reach the WSL terminal"
     mode = cfg.get("resume_mode", "inject")
     if mode == "inject":
         return fire_inject(target, queue_note, cfg)
