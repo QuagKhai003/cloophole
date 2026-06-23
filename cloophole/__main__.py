@@ -419,7 +419,28 @@ def _self_remove_exe() -> None:
     print("done. (Open a NEW terminal - this one still has the old PATH.)")
 
 
+def cmd_wsl_debug(_args: list[str]) -> int:
+    """Diagnostic: print exactly what the WSL detection sees."""
+    from . import winproc, wsl
+    print("tmux claude_sessions:", wsl.claude_sessions())
+    print("plain _claude_cwds  :", wsl._plain_claude_cwds())
+    print("plain_sessions      :", wsl.plain_sessions())
+    named = winproc.all_procs_named()
+    wsls = [(pid, named.get(ppid, (0, ""))[1])
+            for pid, (ppid, name) in named.items() if (name or "").lower() == "wsl.exe"]
+    print("wsl.exe (pid,parent):", wsls)
+    p = wsl._wsl(["bash", "-c",
+                  "for p in $(pgrep -f claude 2>/dev/null); do echo \"$p "
+                  "tmux=$(grep -qz TMUX= /proc/$p/environ && echo Y || echo N) "
+                  "cwd=$(readlink /proc/$p/cwd)\"; done"], timeout=15)
+    print("raw rc :", None if not p else p.returncode)
+    print("raw out:", None if not p else repr(p.stdout))
+    print("raw err:", None if not p else repr(p.stderr))
+    return 0
+
+
 COMMANDS = {
+    "wsl-debug": cmd_wsl_debug,
     "open": cmd_open,
     "_gui": cmd_gui,
     "limit-signal": cmd_limit_signal,
