@@ -147,9 +147,15 @@ def run() -> None:
     v_meta = lbl(sc, "", SUB, ("Segoe UI", 9), bg=PANEL, justify="left")
     v_meta.pack(anchor="w", padx=16, pady=(6, 14))
 
-    # ---------- "resume what" ----------
-    lbl(root, "WHAT TO RESUME AFTER THE RESET", SUB, ("Segoe UI", 8, "bold")).pack(
-        anchor="w", padx=20, pady=(4, 2))
+    # ---------- "resume what" + message mode ----------
+    rw = tk.Frame(root, bg=BG)
+    rw.pack(fill="x", padx=20, pady=(4, 2))
+    v_notehdr = lbl(rw, "MESSAGE TO SEND ON RESUME", SUB, ("Segoe UI", 8, "bold"))
+    v_notehdr.pack(side="left")
+    mode_btn = tk.Label(rw, text="", fg=ACCENT, bg=BG,
+                        font=("Segoe UI", 8, "underline"), cursor="hand2")
+    mode_btn.pack(side="right")
+
     note_var = tk.StringVar(value=state.load().queue_note or "")
 
     def save_note(*_):
@@ -164,8 +170,25 @@ def run() -> None:
     note_entry.pack(fill="x", padx=10, pady=8)
     note_entry.bind("<Return>", save_note)
     note_entry.bind("<FocusOut>", save_note)
-    lbl(root, "blank = pick up where you left off", SUB, ("Segoe UI", 8)).pack(
-        anchor="w", padx=20, pady=(2, 0))
+    note_hint = lbl(root, "", SUB, ("Segoe UI", 8))
+    note_hint.pack(anchor="w", padx=20, pady=(2, 0))
+
+    def _apply_note_mode():
+        per = state.load().note_mode == "per"
+        v_notehdr.config(text="DEFAULT MESSAGE (per-session below overrides)" if per
+                         else "MESSAGE TO SEND ON RESUME")
+        mode_btn.config(text="↔ one message for all" if per else "↔ per-session messages")
+        note_hint.config(text="each ticked session gets its own box below; blank = use default"
+                         if per else "blank = pick up where you left off")
+        _render_sessions(force=True)
+
+    def _toggle_note_mode(*_):
+        st = state.load()
+        st.note_mode = "bulk" if st.note_mode == "per" else "per"
+        state.save(st)
+        _apply_note_mode()
+
+    mode_btn.bind("<Button-1>", _toggle_note_mode)
 
     # ---------- auto-detect (zero-quota Claude hook) ----------
     try:
@@ -312,6 +335,25 @@ def run() -> None:
             if term:
                 lbl(head, f"  ·  {term}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
             lbl(txt, d, SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")
+            if st.note_mode == "per":
+                svar = tk.StringVar(value=(st.session_notes or {}).get(d, ""))
+
+                def _save_sess_note(dd=d, vv=svar):
+                    s = state.load()
+                    notes = dict(s.session_notes or {})
+                    txt_ = vv.get().strip()
+                    if txt_:
+                        notes[dd] = txt_
+                    else:
+                        notes.pop(dd, None)
+                    s.session_notes = notes
+                    state.save(s)
+
+                e = tk.Entry(txt, textvariable=svar, bg=PANEL, fg=FG, insertbackground=FG,
+                             relief="flat", font=("Segoe UI", 9))
+                e.pack(fill="x", pady=(3, 1))
+                e.bind("<Return>", lambda _e, f=_save_sess_note: f())
+                e.bind("<FocusOut>", lambda _e, f=_save_sess_note: f())
         _update_count()
 
     # ---------- button actions ----------
@@ -329,11 +371,10 @@ def run() -> None:
             messagebox.showinfo("cloophole", "No sessions are ticked to resume.")
             return
         # Resume per the configured mode (default: type the note into the open
-        # session). Non-blocking — no waiting on the call.
-        note = state.load().queue_note
+        # session). Each session gets its own message in per-session mode.
         done, errs = 0, []
         for d in targets:
-            err = fire.resume(d, note)
+            err = fire.resume(d, state.note_for(st, d))
             if err:
                 errs.append(err)
             else:
@@ -430,6 +471,7 @@ def run() -> None:
             pass
 
     root.protocol("WM_DELETE_WINDOW", lambda: (_cleanup(), root.destroy()))
+    _apply_note_mode()  # set the toggle label + render per-session boxes if enabled
     # Fit the window to its content so nothing clips. The session list scrolls, so
     # height stays bounded; buttons are bottom-pinned as a backstop.
     root.update_idletasks()
