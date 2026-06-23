@@ -262,7 +262,7 @@ def run() -> None:
 
     sess_wrap = card(root)
     sess_wrap.pack(fill="both", expand=True, padx=PAD, pady=(0, 2))
-    sess_canvas = tk.Canvas(sess_wrap, bg=PANEL, highlightthickness=0, height=132)
+    sess_canvas = tk.Canvas(sess_wrap, bg=PANEL, highlightthickness=0, height=100)
     vsb = tk.Scrollbar(sess_wrap, orient="vertical", command=sess_canvas.yview)
     sess_holder = tk.Frame(sess_canvas, bg=PANEL)
     sess_window = sess_canvas.create_window((0, 0), window=sess_holder, anchor="nw")
@@ -305,6 +305,27 @@ def run() -> None:
         ticked = sum(1 for k in keys if k not in ex)
         v_sesscount.config(text=f"({ticked} of {len(keys)} ticked)" if keys else "")
 
+    def _autosize() -> None:
+        # Grow the window to show every detected session, up to the laptop's screen
+        # height; beyond that the list scrolls (scrollregion is always live, so the
+        # user can scroll regardless of window size).
+        try:
+            root.update_idletasks()
+            screen_h = root.winfo_screenheight()
+            max_h = screen_h - 80  # leave room for taskbar + title bar
+            content_h = max(96, sess_holder.winfo_reqheight() + 6)
+            sess_canvas.config(height=content_h)        # try to show all rows
+            root.update_idletasks()
+            need = root.winfo_reqheight()
+            if need > max_h:                            # too tall -> cap + scroll
+                sess_canvas.config(height=max(96, content_h - (need - max_h)))
+                need = max_h
+            cur_w = root.winfo_width()
+            w = max(460, cur_w if cur_w > 1 else root.winfo_reqwidth())
+            root.geometry(f"{w}x{need + 4}")
+        except Exception:
+            pass
+
     def _render_sessions(force: bool = False) -> None:
         st = state.load()
         sess = _effective_sessions()
@@ -319,6 +340,7 @@ def run() -> None:
             lbl(sess_holder, "•  no Claude session detected right now",
                 SUB, ("Segoe UI", 9), bg=PANEL).pack(anchor="w", padx=8, pady=10)
             _update_count()
+            root.after_idle(_autosize)
             return
         ex = set(st.excluded_dirs or [])
         for s in sess:
@@ -326,18 +348,18 @@ def run() -> None:
             var = tk.BooleanVar(value=(key not in ex))
             row = tk.Frame(sess_holder, bg=PANEL2, highlightbackground=BORDER,
                            highlightthickness=1)
-            row.pack(fill="x", padx=3, pady=3)
+            row.pack(fill="x", padx=2, pady=1)
             cb = tk.Checkbutton(row, variable=var,
                                 command=lambda kk=key, vv=var: toggle_dir(kk, vv),
                                 bg=PANEL2, activebackground=PANEL2, fg=ACCENT,
                                 selectcolor=PANEL, bd=0, highlightthickness=0,
                                 cursor="hand2")
-            cb.pack(side="left", padx=(8, 2), pady=6)
+            cb.pack(side="left", padx=(5, 0), pady=2)
             txt = tk.Frame(row, bg=PANEL2)
-            txt.pack(side="left", fill="x", expand=True, pady=4)
+            txt.pack(side="left", fill="x", expand=True, pady=2)
             head = tk.Frame(txt, bg=PANEL2)
             head.pack(anchor="w", fill="x")
-            fl = lbl(head, s["folder"], FG, ("Segoe UI", 10, "bold"), bg=PANEL2)
+            fl = lbl(head, s["folder"], FG, ("Segoe UI", 9, "bold"), bg=PANEL2)
             fl.pack(side="left")
             if s.get("kind") == "wsl":  # click the name to flash that tmux pane
                 fl.config(cursor="hand2")
@@ -346,8 +368,8 @@ def run() -> None:
                             "cloophole.wsl", fromlist=["highlight"]).highlight(h),
                             daemon=True).start())
             if s.get("label"):
-                lbl(head, f"  ·  {s['label']}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
-            lbl(txt, s.get("path", key), SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")
+                lbl(head, f"  ·  {s['label']}", ACCENT, ("Segoe UI", 7), bg=PANEL2).pack(side="left")
+            lbl(txt, s.get("path", key), SUB, ("Segoe UI", 7), bg=PANEL2).pack(anchor="w")
             if st.note_mode == "per":
                 svar = tk.StringVar(value=(st.session_notes or {}).get(key, ""))
 
@@ -364,9 +386,10 @@ def run() -> None:
 
                 svar.trace_add("write", lambda *_a, f=_save_sess_note: f())
                 e = tk.Entry(txt, textvariable=svar, bg=PANEL, fg=FG, insertbackground=FG,
-                             relief="flat", font=("Segoe UI", 9))
-                e.pack(fill="x", pady=(3, 1))
+                             relief="flat", font=("Segoe UI", 8))
+                e.pack(fill="x", pady=(2, 1))
         _update_count()
+        root.after_idle(_autosize)
 
     # ---------- button actions ----------
     def do_resume():
@@ -449,10 +472,10 @@ def run() -> None:
     # height stays bounded; buttons are bottom-pinned as a backstop.
     root.update_idletasks()
     fit_w = max(460, root.winfo_reqwidth())
-    fit_h = root.winfo_reqheight() + 10
-    root.geometry(f"{fit_w}x{fit_h}")
-    root.minsize(fit_w, 420)
+    root.geometry(f"{fit_w}x{root.winfo_reqheight() + 10}")
+    root.minsize(fit_w, 300)  # _autosize grows/caps height to the session count
     refresh()
+    root.after_idle(_autosize)  # size to the session count once mapped
     import gc
     gc.collect()  # drop import/build garbage before the window goes idle
     try:
