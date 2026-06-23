@@ -43,7 +43,11 @@ forbade**. The project owner explicitly decided to lift that ban.
   path is verified by the user (no console in CI).
 
 ## Notes for the executor
-- `inject.send_text` `FreeConsole`s first (the GUI/daemon has a hidden console),
-  `AttachConsole(pid)`, writes key-down/up records for each char + `VK_RETURN`, then
-  `FreeConsole`. Uncertain for some pseudo-console/terminal setups — iterate with the
-  user if a given terminal doesn't receive it.
+- `inject.send_text` tries two paths: (1) classic console — `AttachConsole(pid)` +
+  `WriteConsoleInput` (works for conhost); (2) **clipboard paste** — find the hosting
+  terminal's window by walking `pid`'s ancestors (`winproc.all_procs` + `EnumWindows`),
+  set the clipboard, `SetForegroundWindow`, `SendInput` Ctrl+V + Enter. Windows Terminal
+  / VS Code / ConPTY need path 2 (the user confirmed WriteConsoleInput fails on WT).
+- **Limits:** paste hits the terminal's ACTIVE tab — a session in a background tab of a
+  multi-tab window can't be singled out. Background callers (daemon) may be denied
+  `SetForegroundWindow` by the OS focus lock; the GUI button (already foreground) is fine.
