@@ -67,6 +67,17 @@ def detect_sessions(cfg: dict) -> tuple[bool, list[str]]:
     return False, []
 
 
+def session_keys(cfg: dict) -> tuple[bool, list[str]]:
+    """(any live, [session keys]) across Windows claude.exe + WSL tmux panes. The
+    keys are what `_fire_dirs` selects and `fire.resume` routes on (a Windows folder,
+    or 'wsl:<pane>')."""
+    if sys.platform != "win32":
+        return detect_sessions(cfg)
+    from . import sessions
+    sess = sessions.list_all(cfg)
+    return bool(sess), [s["key"] for s in sess]
+
+
 def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
     """Which directories to fire in. A pin (st.work_dir) wins; otherwise every
     live session's dir ("fire in all selected terminals"); else inherit cwd."""
@@ -152,7 +163,7 @@ def tick(cfg: dict) -> state.State:
     those saves and lose the user's edits. So we only save on a real transition.
     """
     st = state.load()
-    live, cwds = detect_sessions(cfg)
+    live, cwds = session_keys(cfg)   # keys = Windows folders + WSL tmux panes
     now = datetime.now(timezone.utc)
 
     # Zero-quota auto-detect: Claude's StopFailure/rate_limit hook dropped a signal.

@@ -173,27 +173,15 @@ def cmd_send(args: list[str]) -> int:
 
 
 def cmd_sessions(_args: list[str]) -> int:
-    """List the live Claude sessions cloophole detects, named by folder + terminal."""
-    from pathlib import Path
-
-    if sys.platform == "win32":
-        from . import winproc
-        detail = winproc.sessions_detail(config.load()["claude_process_name"])
-        if not detail:
-            print("no live Claude session detected.")
-            return 0
-        print(f"{len(detail)} live Claude session(s):")
-        for _pid, cwd, term in detail:
-            where = f"{Path(cwd).name or cwd}   ({cwd})" if cwd else "(folder unreadable)"
-            print(f"  - {where}" + (f"   [{term}]" if term else ""))
-        return 0
-    from . import daemon
-    live, dirs = daemon.detect_sessions(config.load())
-    if not live:
+    """List the live Claude sessions cloophole detects (Windows + WSL tmux panes)."""
+    from . import sessions
+    sess = sessions.list_all(config.load())
+    if not sess:
         print("no live Claude session detected.")
         return 0
-    for d in dirs:
-        print(f"  - {Path(d).name or d}   ({d})")
+    print(f"{len(sess)} live Claude session(s):")
+    for s in sess:
+        print(f"  - {s['folder']}   [{s['label'] or s['kind']}]   ({s.get('path', s['key'])})")
     return 0
 
 
