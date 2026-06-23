@@ -207,6 +207,43 @@ def _paste_into(pid: int, text: str, submit: bool) -> bool:
     return True
 
 
+def diagnose(pid: int) -> dict:
+    """What the injector sees for `pid` — for debugging why a send failed."""
+    info: dict = {"pid": pid, "chain": [], "hwnd": None, "windows": []}
+    if _k32 is None:
+        return info
+    from . import winproc
+    named = winproc.all_procs_named()
+    cur, seen = pid, set()
+    for _ in range(12):
+        node = named.get(cur)
+        if not node:
+            break
+        ppid, name = node
+        info["chain"].append(f"{cur}:{name}")
+        if not ppid or ppid in seen:
+            break
+        seen.add(cur)
+        cur = ppid
+    chain_pids = _ancestors(pid, named)
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _cb(hwnd, _lp):
+        if _u32.IsWindowVisible(hwnd):
+            wpid = wintypes.DWORD()
+            _u32.GetWindowThreadProcessId(hwnd, ctypes.byref(wpid))
+            if wpid.value in chain_pids:
+                n = _u32.GetWindowTextLengthW(hwnd)
+                buf = ctypes.create_unicode_buffer(n + 1)
+                _u32.GetWindowTextW(hwnd, buf, n + 1)
+                info["windows"].append(f"{wpid.value}:{buf.value!r}")
+        return True
+
+    _u32.EnumWindows(_cb, 0)
+    info["hwnd"] = _terminal_hwnd(pid)
+    return info
+
+
 def send_text(pid: int, text: str, submit: bool = True) -> bool:
     """Put `text` (+ Enter) into the console of process `pid`. Never raises.
 

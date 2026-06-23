@@ -105,18 +105,25 @@ def cmd_send(args: list[str]) -> int:
         print('usage: cloophole send "<text>"')
         return 2
     text = " ".join(args)
-    _live, dirs = daemon.detect_sessions(config.load())
-    if not dirs:
+    if sys.platform != "win32":
+        print("send is Windows-only")
+        return 1
+    from . import inject, winproc
+    detail = winproc.sessions_detail(config.load()["claude_process_name"])
+    if not detail:
         print("no live Claude session with a readable folder.")
         return 1
     sent = 0
-    for d in dirs:
-        err = fire.fire_inject(d, text, config.load())
-        if err:
-            print(f"  {d}: {err}")
-        else:
-            print(f"  sent -> {d}")
+    for pid, cwd, term in detail:
+        ok = inject.send_text(pid, text)
+        print(f"  {cwd}  [{term}]  pid={pid}  -> {'sent' if ok else 'FAILED'}")
+        if ok:
             sent += 1
+        else:
+            d = inject.diagnose(pid)
+            print(f"     chain:   {' <- '.join(d['chain'])}")
+            print(f"     windows: {d['windows'] or 'none found in ancestry'}")
+            print(f"     hwnd:    {d['hwnd']}")
     print(f"typed into {sent} session(s).")
     return 0 if sent else 1
 
