@@ -30,10 +30,10 @@ def list_all(cfg: dict) -> List[dict]:
         if not cwd:
             continue
         out.append({
-            "key": cwd,                       # Windows: the folder is the key
+            "key": f"win:{pid}",              # pid -> unique even if 2 share a folder
             "folder": Path(cwd).name or cwd,
             "path": cwd,
-            "label": term or "",
+            "label": f"{term or 'cmd'} · pid {pid}",
             "kind": "win",
             "handle": pid,
         })
@@ -55,7 +55,7 @@ def list_all(cfg: dict) -> List[dict]:
                 "key": f"wslp:{host_pid}",    # plain WSL: the Windows host pid
                 "folder": f"{folder}  (WSL)",
                 "path": path,
-                "label": "WSL",
+                "label": f"WSL · pid {host_pid}",
                 "kind": "wslp",
                 "handle": host_pid,
             })
