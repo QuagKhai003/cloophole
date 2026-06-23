@@ -34,6 +34,28 @@ from datetime import datetime, timezone
 from . import config, daemon, fire, state
 from .reset_parser import parse_reset
 
+# Hardcoded so `cloophole help` still works in the frozen exe (optimize=2 strips
+# module docstrings, which would otherwise make help print "None").
+USAGE = """cloophole — auto-resume Claude Code after the usage limit resets.
+
+  cloophole open                   start the watcher + open the app window
+  cloophole close                  stop the watcher + close the window
+  cloophole status                 show state + countdown
+  cloophole sessions               list live Claude sessions (folder + terminal)
+  cloophole send "<text>"          type text into every live Claude session
+  cloophole report "<limit text>"  parse reset time, arm -> WAITING
+  cloophole queue "<note>"         set what to continue
+  cloophole dir <path>             pin one dir (else fire all live sessions)
+  cloophole fire-now               fire immediately (ignores gate)
+  cloophole hook on|off            zero-quota limit auto-detect (Claude hook)
+  cloophole poll on|off            idle quota auto-detection (opt-in; costs quota)
+  cloophole arm <when>             manually arm: "5:30 PM" / "in 2h" / ISO
+  cloophole clear                  back to WATCHING, drop reset/limit
+  cloophole config [key [value]]   show / get / set config
+  cloophole daemon                 run the watcher in the foreground
+  cloophole uninstall              stop everything + remove app data
+"""
+
 
 def _fmt_countdown(st: state.State) -> str:
     dt = st.reset_dt()
@@ -113,18 +135,20 @@ def cmd_send(args: list[str]) -> int:
     if not detail:
         print("no live Claude session with a readable folder.")
         return 1
-    sent = 0
+    # Print ALL diagnostics first and flush — send_text may detach our console
+    # (console-input path) and silence later prints.
     for pid, cwd, term in detail:
-        ok = inject.send_text(pid, text)
-        print(f"  {cwd}  [{term}]  pid={pid}  -> {'sent' if ok else 'FAILED'}")
-        if ok:
-            sent += 1
-        else:
-            d = inject.diagnose(pid)
-            print(f"     chain:   {' <- '.join(d['chain'])}")
-            print(f"     windows: {d['windows'] or 'none found in ancestry'}")
-            print(f"     hwnd:    {d['hwnd']}")
-    print(f"typed into {sent} session(s).")
+        d = inject.diagnose(pid)
+        print(f"{cwd}  [{term}]  pid={pid}")
+        print(f"   chain:   {' <- '.join(d['chain'])}")
+        print(f"   windows: {d['windows'] or 'NONE found in ancestry'}")
+        print(f"   hwnd:    {d['hwnd']}")
+    sys.stdout.flush()
+    sent = sum(1 for pid, _c, _t in detail if inject.send_text(pid, text))
+    try:
+        print(f"\ntyped into {sent} session(s).")
+    except OSError:
+        pass
     return 0 if sent else 1
 
 
@@ -412,13 +436,13 @@ COMMANDS = {
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv or argv[0] in ("-h", "--help", "help"):
-        print(__doc__)
+        print(USAGE)
         return 0
     cmd, rest = argv[0], argv[1:]
     fn = COMMANDS.get(cmd)
     if not fn:
         print(f"unknown command: {cmd}\n")
-        print(__doc__)
+        print(USAGE)
         return 2
     return fn(rest)
 
