@@ -82,8 +82,9 @@ def cmd_version(_args: list[str]) -> int:
 def cmd_status(_args: list[str]) -> int:
     from . import runner
     st = state.load()
-    live, _ = daemon.detect_sessions(config.load())  # detect now (daemon no longer persists it)
-    print(f"daemon       {'running' if runner.is_running() else 'stopped'}")
+    live, _ = daemon.detect_sessions(config.load())
+    watching = runner.is_gui_running()  # the window IS the watcher now
+    print(f"watcher      {'running (window open)' if watching else 'stopped (open the window)'}")
     print(f"phase        {st.phase}")
     print(f"reset_at     {st.reset_at or '-'}{_fmt_countdown(st)}")
     print(f"live session {'yes' if live else 'no'}")
@@ -274,17 +275,13 @@ def cmd_daemon(_args: list[str]) -> int:
 
 
 def cmd_open(_args: list[str]) -> int:
-    """Clean-restart the background watcher and open the app window.
-
-    Sweeps any existing/orphan cloophole processes first so EXACTLY ONE current
-    daemon runs — duplicates (e.g. left over from an upgrade) would otherwise race
-    on state.json and make the session list flicker (B14)."""
+    """Open the app window. The WINDOW is the watcher — there is no separate daemon
+    process anymore (that caused races/orphans/clobbering). We still sweep any old
+    daemon/window left by previous versions so only this one window runs."""
     from . import claude_hook, runner
     runner.stop_gui()
-    runner.stop()
-    runner.kill_all()  # drop orphan/duplicate daemons + windows (frozen)
-    runner.launch()
-    print("cloophole watcher started in the background.")
+    runner.stop()       # stop any legacy daemon from an older build
+    runner.kill_all()   # drop orphan/duplicate cloophole processes
     # Zero-quota auto-detect: register the rate-limit hook in Claude's settings.
     try:
         newly = not claude_hook.hook_installed()
@@ -297,7 +294,7 @@ def cmd_open(_args: list[str]) -> int:
     except Exception:
         pass
     runner.launch_gui()
-    print("Opening cloophole...")
+    print("Opening cloophole… (the window watches for the limit; keep it open).")
     return 0
 
 
