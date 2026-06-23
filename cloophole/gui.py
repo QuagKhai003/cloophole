@@ -100,23 +100,15 @@ def run() -> None:
     import sys as _sys
     import time as _time
 
-    from . import config as _config, daemon as _daemon
-    _detected = {"dirs": [], "live": False, "terms": {}}
+    from . import config as _config, daemon as _daemon, sessions as _sessions
+    _detected = {"sessions": [], "live": False}
 
     def _detect_loop():
         while True:
             try:
-                if _sys.platform == "win32":
-                    from . import winproc
-                    detail = winproc.sessions_detail(_config.load()["claude_process_name"])
-                    dirs = [cwd for _pid, cwd, _t in detail if cwd]
-                    live = bool(detail)
-                    _detected["terms"] = {cwd: term for _pid, cwd, term in detail if cwd}
-                else:
-                    live, dirs = _daemon.detect_sessions(_config.load())
-                _detected["live"] = live
-                if dirs or not live:  # keep last good on a transient empty read
-                    _detected["dirs"] = list(dirs)
+                sess = _sessions.list_all(_config.load())  # Windows + WSL tmux panes
+                _detected["live"] = bool(sess)
+                _detected["sessions"] = sess
             except Exception:
                 pass
             _time.sleep(1.5)
@@ -254,8 +246,8 @@ def run() -> None:
 
     def _set_all(ticked: bool):
         st = state.load()
-        dirs = list(_rendered.get("dirs") or [])  # the folders currently shown
-        st.excluded_dirs = [] if ticked else list(dirs)
+        keys = list(_rendered.get("keys") or [])  # the sessions currently shown
+        st.excluded_dirs = [] if ticked else list(keys)
         state.save_user(st)
         _render_sessions(force=True)
 
@@ -284,61 +276,59 @@ def run() -> None:
     sess_canvas.bind_all(
         "<MouseWheel>", lambda e: sess_canvas.yview_scroll(int(-e.delta / 120), "units"))
 
-    def toggle_dir(d: str, var) -> None:
+    def toggle_dir(key: str, var) -> None:
         st = state.load()
         ex = set(st.excluded_dirs or [])
-        ex.discard(d) if var.get() else ex.add(d)
+        ex.discard(key) if var.get() else ex.add(key)
         st.excluded_dirs = sorted(ex)
         state.save_user(st)
         _update_count()
 
-    # Per-folder stickiness: each detected folder lingers for _STICKY refreshes after
-    # it stops being seen, so one missed PEB read (the daemon re-detects every ~15s and
-    # a folder read can flake for a tick) can't blink a session in and out. A folder
-    # that genuinely closes disappears after _STICKY seconds.
-    _rendered = {"dirs": None}
-    _seen: dict[str, float] = {}
-    _STICKY_SEC = 6.0  # time-based, independent of refresh rate; the detect thread
-                       # already smooths transient empties, so this can be short
+    # Per-session stickiness (keyed by the unique session key, so a WSL pane and a
+    # Windows folder are distinct): each session lingers _STICKY_SEC after it stops
+    # being seen, so one flaky detection can't blink it in and out.
+    _rendered = {"keys": None}
+    _seen: dict[str, tuple] = {}   # key -> (monotonic_time, session dict)
+    _STICKY_SEC = 6.0
 
-    def _effective_dirs() -> list:
+    def _effective_sessions() -> list:
         now = _time.monotonic()
-        for d in _detected["dirs"] or []:
-            _seen[d] = now
-        for d in [d for d, t in _seen.items() if now - t > _STICKY_SEC]:
-            del _seen[d]
-        return sorted(_seen)
+        for s in _detected["sessions"] or []:
+            _seen[s["key"]] = (now, s)
+        for k in [k for k, (t, _s) in _seen.items() if now - t > _STICKY_SEC]:
+            del _seen[k]
+        return [s for _t, s in sorted(_seen.values(), key=lambda ts: ts[1]["key"])]
 
     def _update_count():
-        dirs = _rendered["dirs"] or []
+        keys = _rendered.get("keys") or []
         ex = set(state.load().excluded_dirs or [])
-        ticked = sum(1 for d in dirs if d not in ex)
-        v_sesscount.config(text=f"({ticked} of {len(dirs)} ticked)" if dirs else "")
+        ticked = sum(1 for k in keys if k not in ex)
+        v_sesscount.config(text=f"({ticked} of {len(keys)} ticked)" if keys else "")
 
     def _render_sessions(force: bool = False) -> None:
         st = state.load()
-        dirs = _effective_dirs()
-        if not force and dirs == _rendered["dirs"]:
+        sess = _effective_sessions()
+        keys = [s["key"] for s in sess]
+        if not force and keys == _rendered["keys"]:
             _update_count()
             return
-        _rendered["dirs"] = dirs
+        _rendered["keys"] = keys
         for w in sess_holder.winfo_children():
             w.destroy()
-        if not dirs:
-            msg = ("a Claude session is open but its folder is unreadable"
-                   if _detected["live"] else "no Claude session detected right now")
-            lbl(sess_holder, "•  " + msg, SUB, ("Segoe UI", 9), bg=PANEL).pack(
-                anchor="w", padx=8, pady=10)
+        if not sess:
+            lbl(sess_holder, "•  no Claude session detected right now",
+                SUB, ("Segoe UI", 9), bg=PANEL).pack(anchor="w", padx=8, pady=10)
             _update_count()
             return
         ex = set(st.excluded_dirs or [])
-        for d in dirs:
-            var = tk.BooleanVar(value=(d not in ex))
+        for s in sess:
+            key = s["key"]
+            var = tk.BooleanVar(value=(key not in ex))
             row = tk.Frame(sess_holder, bg=PANEL2, highlightbackground=BORDER,
                            highlightthickness=1)
             row.pack(fill="x", padx=3, pady=3)
             cb = tk.Checkbutton(row, variable=var,
-                                command=lambda dd=d, vv=var: toggle_dir(dd, vv),
+                                command=lambda kk=key, vv=var: toggle_dir(kk, vv),
                                 bg=PANEL2, activebackground=PANEL2, fg=ACCENT,
                                 selectcolor=PANEL, bd=0, highlightthickness=0,
                                 cursor="hand2")
@@ -347,24 +337,23 @@ def run() -> None:
             txt.pack(side="left", fill="x", expand=True, pady=4)
             head = tk.Frame(txt, bg=PANEL2)
             head.pack(anchor="w", fill="x")
-            lbl(head, Path(d).name or d, FG, ("Segoe UI", 10, "bold"), bg=PANEL2).pack(side="left")
-            term = (_detected["terms"] or {}).get(d)
-            if term:
-                lbl(head, f"  ·  {term}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
-            lbl(txt, d, SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")
+            lbl(head, s["folder"], FG, ("Segoe UI", 10, "bold"), bg=PANEL2).pack(side="left")
+            if s.get("label"):
+                lbl(head, f"  ·  {s['label']}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
+            lbl(txt, s.get("path", key), SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")
             if st.note_mode == "per":
-                svar = tk.StringVar(value=(st.session_notes or {}).get(d, ""))
+                svar = tk.StringVar(value=(st.session_notes or {}).get(key, ""))
 
-                def _save_sess_note(dd=d, vv=svar):
-                    s = state.load()
-                    notes = dict(s.session_notes or {})
-                    txt_ = vv.get().strip()
-                    if txt_:
-                        notes[dd] = txt_
+                def _save_sess_note(kk=key, vv=svar):
+                    s2 = state.load()
+                    notes = dict(s2.session_notes or {})
+                    t = vv.get().strip()
+                    if t:
+                        notes[kk] = t
                     else:
-                        notes.pop(dd, None)
-                    s.session_notes = notes
-                    state.save_user(s)
+                        notes.pop(kk, None)
+                    s2.session_notes = notes
+                    state.save_user(s2)
 
                 svar.trace_add("write", lambda *_a, f=_save_sess_note: f())
                 e = tk.Entry(txt, textvariable=svar, bg=PANEL, fg=FG, insertbackground=FG,
@@ -376,13 +365,12 @@ def run() -> None:
     def do_resume():
         save_note()
         st = state.load()
-        # Fire the folders the user actually SEES ticked (the sticky displayed list),
-        # not the raw live_dirs which can be momentarily empty between daemon ticks.
+        # Resume the sessions the user SEES ticked (keys = Windows folders + WSL panes).
         if st.work_dir:
             targets = [st.work_dir]
         else:
             ex = set(st.excluded_dirs or [])
-            targets = [d for d in (_rendered["dirs"] or []) if d not in ex]
+            targets = [k for k in (_rendered.get("keys") or []) if k not in ex]
         if not targets:
             messagebox.showinfo("cloophole", "No sessions are ticked to resume.")
             return

@@ -81,18 +81,23 @@ def fire_inject(work_dir: Optional[str], queue_note: Optional[str],
     return None if inject.send_text(target, text) else "couldn't type into the session"
 
 
-def resume(work_dir: Optional[str], queue_note: Optional[str],
+def resume(target: Optional[str], queue_note: Optional[str],
            cfg: Optional[dict] = None) -> Optional[str]:
-    """Resume per the configured mode. Returns None on success, else an error string.
-    `inject` (default) types into the existing session; `window` opens a visible
-    `claude --continue`; anything else runs the headless `fire()`."""
+    """Resume the session identified by `target`. Returns None on success, else an
+    error string. A 'wsl:<pane>' target is a WSL tmux pane (send-keys); otherwise
+    `target` is a Windows folder and we use the configured resume_mode (inject /
+    window / headless)."""
     cfg = cfg or config.load()
+    if target and str(target).startswith("wsl:"):
+        from . import wsl
+        text = (queue_note or "").strip() or FALLBACK_NOTE
+        return None if wsl.send_keys(str(target)[4:], text) else "couldn't reach the WSL pane"
     mode = cfg.get("resume_mode", "inject")
     if mode == "inject":
-        return fire_inject(work_dir, queue_note, cfg)
+        return fire_inject(target, queue_note, cfg)
     if mode == "window":
-        return fire_visible(work_dir, queue_note, cfg)
-    return fire(work_dir, queue_note, cfg).error
+        return fire_visible(target, queue_note, cfg)
+    return fire(target, queue_note, cfg).error
 
 
 def fire_visible(work_dir: Optional[str], queue_note: Optional[str],
