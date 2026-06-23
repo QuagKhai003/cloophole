@@ -63,6 +63,8 @@ def _configure() -> None:
     _u32.SetClipboardData.argtypes = [U, H]; _u32.SetClipboardData.restype = H
     _u32.CloseClipboard.argtypes = []; _u32.CloseClipboard.restype = B
     _u32.SetForegroundWindow.argtypes = [wintypes.HWND]; _u32.SetForegroundWindow.restype = B
+    _u32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]; _u32.ShowWindow.restype = B
+    _u32.BringWindowToTop.argtypes = [wintypes.HWND]; _u32.BringWindowToTop.restype = B
     _u32.SendInput.argtypes = [U, ctypes.c_void_p, ctypes.c_int]; _u32.SendInput.restype = U
     _u32.IsWindowVisible.argtypes = [wintypes.HWND]; _u32.IsWindowVisible.restype = B
     _u32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(D)]
@@ -214,6 +216,27 @@ def _terminal_hwnd(pid: int) -> int | None:
         return None
     found.sort(key=lambda t: -t[1])
     return found[0][0]
+
+
+SW_RESTORE = 9
+
+
+def focus(pid: int) -> bool:
+    """Bring the terminal window hosting `pid` to the foreground (un-minimize +
+    raise). True if a window was found and raised. Windows-only, best-effort.
+    Used by the GUI: click a session row to surface its terminal."""
+    if _u32 is None:
+        return False
+    hwnd = _terminal_hwnd(pid)
+    if not hwnd:
+        return False
+    try:
+        _u32.ShowWindow(hwnd, SW_RESTORE)   # restore if minimized
+        _u32.BringWindowToTop(hwnd)
+        _u32.SetForegroundWindow(hwnd)
+        return True
+    except Exception:
+        return False
 
 
 def _ki(vk: int, up: bool = False) -> _INPUT:
