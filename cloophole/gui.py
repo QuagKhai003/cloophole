@@ -413,7 +413,7 @@ def run() -> None:
         state.save_runtime(st)
 
     mkbtn(actions, "▶  Resume now", do_resume, accent=True, grid=(0, 0), columnspan=2)
-    mkbtn(actions, "Not limited / clear", clear_limit, grid=(1, 0))
+    mkbtn(actions, "Reset the detected time limit", clear_limit, grid=(1, 0))
     mkbtn(actions, "Close", lambda: (_cleanup(), root.destroy()), grid=(1, 1))
 
     # ---------- live refresh ----------
