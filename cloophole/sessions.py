@@ -42,12 +42,22 @@ def list_all(cfg: dict) -> List[dict]:
         for pane, path in wsl.claude_sessions():
             folder = PurePosixPath(path).name or path
             out.append({
-                "key": f"wsl:{pane}",         # WSL: the pane id makes it unique
+                "key": f"wsl:{pane}",         # WSL+tmux: the pane id makes it unique
                 "folder": f"{folder}  {pane}",
                 "path": path,
                 "label": "WSL · tmux",
                 "kind": "wsl",
                 "handle": pane,
+            })
+        for host_pid, path in wsl.plain_sessions():
+            folder = PurePosixPath(path).name or path
+            out.append({
+                "key": f"wslp:{host_pid}",    # plain WSL: the Windows host pid
+                "folder": f"{folder}  (WSL)",
+                "path": path,
+                "label": "WSL",
+                "kind": "wslp",
+                "handle": host_pid,
             })
     except Exception:
         pass

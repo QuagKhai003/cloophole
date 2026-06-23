@@ -32,5 +32,6 @@ tests/
 CLAUDE.md
 claude-resume-product-plan.md
 reset.ps1
+wsldiag.ps1
 getstatecontent.txt
 outputreset.txt
