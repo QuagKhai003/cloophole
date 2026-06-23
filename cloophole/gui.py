@@ -95,15 +95,23 @@ def run() -> None:
     # Detect sessions ourselves (OS process inspection — Golden-Rule-fine) on a
     # background thread, rather than depend on the daemon writing live_dirs to state
     # at just the right moment (a spawned GUI could otherwise read it empty forever).
+    import sys as _sys
     import time as _time
 
     from . import config as _config, daemon as _daemon
-    _detected = {"dirs": [], "live": False}
+    _detected = {"dirs": [], "live": False, "terms": {}}
 
     def _detect_loop():
         while True:
             try:
-                live, dirs = _daemon.detect_sessions(_config.load())
+                if _sys.platform == "win32":
+                    from . import winproc
+                    detail = winproc.sessions_detail(_config.load()["claude_process_name"])
+                    dirs = [cwd for _pid, cwd, _t in detail if cwd]
+                    live = bool(detail)
+                    _detected["terms"] = {cwd: term for _pid, cwd, term in detail if cwd}
+                else:
+                    live, dirs = _daemon.detect_sessions(_config.load())
                 _detected["live"] = live
                 if dirs or not live:  # keep last good on a transient empty read
                     _detected["dirs"] = list(dirs)
@@ -294,7 +302,12 @@ def run() -> None:
             cb.pack(side="left", padx=(8, 2), pady=6)
             txt = tk.Frame(row, bg=PANEL2)
             txt.pack(side="left", fill="x", expand=True, pady=4)
-            lbl(txt, Path(d).name or d, FG, ("Segoe UI", 10, "bold"), bg=PANEL2).pack(anchor="w")
+            head = tk.Frame(txt, bg=PANEL2)
+            head.pack(anchor="w", fill="x")
+            lbl(head, Path(d).name or d, FG, ("Segoe UI", 10, "bold"), bg=PANEL2).pack(side="left")
+            term = (_detected["terms"] or {}).get(d)
+            if term:
+                lbl(head, f"  ·  {term}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
             lbl(txt, d, SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")
         _update_count()
 

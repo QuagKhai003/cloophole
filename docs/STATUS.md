@@ -3,9 +3,17 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0012 — inject resume into the open session; Golden Rule revised)
+**Last updated:** 2026-06-23 (inject paste for WT + per-session terminal-type detection)
 
 ## Active task
+**Inject resume (ADR-0012) + terminal-type detection — DONE on `main`, pending user
+verify.** Resume types the note into the existing session (`resume_mode=inject`):
+console-input first, else clipboard **paste** + Ctrl+V (Windows Terminal/ConPTY). Now
+also detects the host terminal per session (`winproc.host_terminal`/`sessions_detail`)
+and shows it in the GUI list + `cloophole sessions`. WSL-internal claude is undetectable
+(Linux process). 51 tests. RISK: paste path unverifiable in CI — user confirms on WT.
+
+## (prior) Active task
 **Inject resume (ADR-0012) — DONE on `main`, pending CI + user verify.** Resume now
 TYPES the note into the user's existing `claude` session (default `resume_mode=inject`):
 `fire_inject` matches the session by folder (`winproc.session_pids`) and
