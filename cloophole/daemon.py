@@ -144,15 +144,15 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
 
 
 def tick(cfg: dict) -> state.State:
-    """One iteration of the loop. Returns the (possibly updated) state."""
+    """One iteration of the loop. Returns the (possibly updated) state.
+
+    IMPORTANT: an idle tick must NOT write state. The GUI self-detects sessions and
+    saves the user's intent (notes/ticks) on every change; if the daemon also wrote
+    state every few seconds (for live_dirs the GUI doesn't even read) it would fight
+    those saves and lose the user's edits. So we only save on a real transition.
+    """
     st = state.load()
     live, cwds = detect_sessions(cfg)
-    st.live_session = live
-    # Keep the last good list on a transient empty read (a PEB cwd read can flake
-    # while Claude is still live) so the GUI list doesn't flicker. Only clear it
-    # when no session is live at all.
-    if cwds or not live:
-        st.live_dirs = list(cwds)
     now = datetime.now(timezone.utc)
 
     # Zero-quota auto-detect: Claude's StopFailure/rate_limit hook dropped a signal.
@@ -218,6 +218,8 @@ def tick(cfg: dict) -> state.State:
                 return state.load()
             st.phase = state.ARMED
             log("reset reached, no live session -> ARMED")
+            state.save_runtime(st)   # persist the WAITING -> ARMED transition
+            return st
 
     elif st.phase == state.ARMED:
         if live:
@@ -225,7 +227,7 @@ def tick(cfg: dict) -> state.State:
             _do_fire(st, cfg, cwds)
             return state.load()
 
-    state.save_runtime(st)
+    # Idle tick — no transition: DO NOT write state (would clobber the GUI's edits).
     return st
 
 

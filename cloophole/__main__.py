@@ -82,10 +82,11 @@ def cmd_version(_args: list[str]) -> int:
 def cmd_status(_args: list[str]) -> int:
     from . import runner
     st = state.load()
+    live, _ = daemon.detect_sessions(config.load())  # detect now (daemon no longer persists it)
     print(f"daemon       {'running' if runner.is_running() else 'stopped'}")
     print(f"phase        {st.phase}")
     print(f"reset_at     {st.reset_at or '-'}{_fmt_countdown(st)}")
-    print(f"live session {'yes' if st.live_session else 'no'}")
+    print(f"live session {'yes' if live else 'no'}")
     print(f"work_dir     {st.work_dir or '(all live sessions)'}")
     print(f"queued       {st.queue_note or '(fallback)'}")
     print(f"last_fired   {st.last_fired or 'never'}")

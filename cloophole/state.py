@@ -89,13 +89,28 @@ def load() -> State:
 
 def save(st: State) -> None:
     st.updated_at = _now_iso()
-    # Atomic write (tmp + replace) so a concurrent reader (the daemon) never sees a
-    # half-written file — the GUI now saves on every keystroke.
     import os
+    import time
     f = paths.state_file()
+    data = json.dumps(asdict(st), indent=2)
     tmp = f.with_name(f.name + ".tmp")
-    tmp.write_text(json.dumps(asdict(st), indent=2), encoding="utf-8")
-    os.replace(tmp, f)
+    tmp.write_text(data, encoding="utf-8")
+    # Atomic replace, but on Windows os.replace fails if another process has the
+    # target open (a reader) — retry briefly, then fall back to an in-place write so
+    # the save is never silently dropped.
+    for _ in range(20):
+        try:
+            os.replace(tmp, f)
+            return
+        except PermissionError:
+            time.sleep(0.02)
+    try:
+        f.write_text(data, encoding="utf-8")
+    finally:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
 
 
 # The GUI owns the user's intent; the daemon owns runtime. They write the SAME file,
