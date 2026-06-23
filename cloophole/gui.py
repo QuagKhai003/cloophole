@@ -1,22 +1,21 @@
 """Dedicated desktop window (Tkinter) — the app UI (ADR-0007, ADR-0010).
 
-@context  cloophole's UI is a small native window (not web, not tray). Shows live
-          status, a scrollable list of detected Claude sessions with a tick box each
-          (ticked = resume fired there; default all ticked), and action buttons. The
-          background watcher runs as a separate process; this views/controls it via
-          the shared state file.
-@done     run(): single-instance Tk window, fast refresh, phase badge, note field,
-          hook on/off line, scrollable per-session checkboxes (excluded_dirs),
-          resume-selected + limit/folder/reset/stop. THE WINDOW IS THE WATCHER: a
-          background thread runs daemon.tick (no separate daemon process). Stdlib only.
+@context  cloophole's UI is a small native window (not web, not tray) AND the watcher:
+          it self-detects sessions, runs the state-machine tick in a thread, and shows
+          a scrollable list of detected Claude sessions with a tick box each (ticked =
+          resume there; default all ticked) + a message box per session.
+@done     run(): single-instance Tk window, fast refresh, phase badge, message field
+          (bulk/per-session), hook on/off line, scrollable per-session checkboxes
+          (excluded_dirs); buttons = Resume now / Not limited-clear / Close. Two
+          threads: detect (display) + watch (daemon.tick). Stdlib tkinter only.
 @todo     mac/Linux polish.
-@limits   Needs a display. Headless? use `cloophole daemon`. One window at a time
-          (gui.pid). Closing the window leaves the watcher running.
-@affects  Launched by CLI `_gui` (spawned by runner from `open`). READS via a self
-          thread: winproc.sessions_detail (dirs + terminal label). WRITES state
-          (queue_note, excluded_dirs ticks, work_dir pin). Resume -> fire.resume per
-          ticked dir. Also: claude_hook.hook_installed (status line), runner.stop.
-          Changing state/config fields or fire.resume's signature affects this file.
+@limits   Needs a display. The window IS the watcher — CLOSING IT STOPS WATCHING.
+          One window at a time (gui.pid). `cloophole daemon` still runs headless.
+@affects  Launched by CLI `_gui` (spawned by runner from `open`). READS winproc.
+          sessions_detail (self thread) + claude_hook.hook_installed. WRITES state via
+          save_user (queue_note, excluded_dirs, note_mode, session_notes). Resume +
+          the watch thread call fire.resume / daemon.tick. State/config field or
+          fire.resume signature changes affect this file.
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ from pathlib import Path
 
 from . import fire, state
 from .paths import gui_pid_file
-from .reset_parser import parse_reset
 
 _PHASE_PLAIN = {
     state.WATCHING: "Watching for your usage limit",
@@ -75,7 +73,7 @@ def _countdown(st: state.State) -> str:
 def run() -> None:
     import os
     import tkinter as tk
-    from tkinter import filedialog, messagebox, simpledialog
+    from tkinter import messagebox
 
     from . import claude_hook, runner
 
@@ -142,33 +140,34 @@ def run() -> None:
 
     threading.Thread(target=_watch_loop, daemon=True).start()
 
+    PAD = 16  # one consistent horizontal margin for everything
+
     # ---------- header ----------
     head = tk.Frame(root, bg=BG)
-    head.pack(fill="x", padx=20, pady=(16, 6))
-    lbl(head, "● ", ACCENT, ("Segoe UI", 12, "bold")).pack(side="left")
-    lbl(head, "cloophole", FG, ("Segoe UI", 18, "bold")).pack(side="left")
-    lbl(root, "Keeps your Claude Code work going after the usage limit resets.",
-        SUB, ("Segoe UI", 9)).pack(anchor="w", padx=22)
+    head.pack(fill="x", padx=PAD, pady=(12, 0))
+    lbl(head, "● ", ACCENT, ("Segoe UI", 11, "bold")).pack(side="left")
+    lbl(head, "cloophole", FG, ("Segoe UI", 16, "bold")).pack(side="left")
+    lbl(root, "Keeps your Claude Code going after the usage limit resets.",
+        SUB, ("Segoe UI", 9)).pack(anchor="w", padx=PAD + 2)
 
     # ---------- status card ----------
     sc = card(root)
-    sc.pack(fill="x", padx=18, pady=(12, 8))
+    sc.pack(fill="x", padx=PAD, pady=(10, 6))
     phase_row = tk.Frame(sc, bg=PANEL)
-    phase_row.pack(fill="x", padx=16, pady=(14, 2))
+    phase_row.pack(fill="x", padx=12, pady=(10, 2))
     v_dot = lbl(phase_row, "●", SUB, ("Segoe UI", 11), bg=PANEL)
     v_dot.pack(side="left", padx=(0, 8))
     v_status = lbl(phase_row, "", FG, ("Segoe UI", 11, "bold"), bg=PANEL)
     v_status.pack(side="left")
-    # big countdown — only shown (packed) when there's a reset to count down to,
-    # otherwise it would leave a tall empty gap in the card.
-    v_count = lbl(sc, "", ACCENT, ("Segoe UI", 26, "bold"), bg=PANEL)
+    # big countdown — only shown when there's a reset to count down to.
+    v_count = lbl(sc, "", ACCENT, ("Segoe UI", 24, "bold"), bg=PANEL)
     v_meta = lbl(sc, "", SUB, ("Segoe UI", 9), bg=PANEL, justify="left")
-    v_meta.pack(anchor="w", padx=16, pady=(6, 14))
+    v_meta.pack(anchor="w", padx=12, pady=(4, 10))
 
-    # ---------- "resume what" + message mode ----------
+    # ---------- message + mode ----------
     rw = tk.Frame(root, bg=BG)
-    rw.pack(fill="x", padx=20, pady=(4, 2))
-    v_notehdr = lbl(rw, "MESSAGE TO SEND ON RESUME", SUB, ("Segoe UI", 8, "bold"))
+    rw.pack(fill="x", padx=PAD, pady=(6, 2))
+    v_notehdr = lbl(rw, "MESSAGE TO SEND", SUB, ("Segoe UI", 8, "bold"))
     v_notehdr.pack(side="left")
     mode_btn = tk.Label(rw, text="", fg=ACCENT, bg=BG,
                         font=("Segoe UI", 8, "underline"), cursor="hand2")
@@ -183,14 +182,14 @@ def run() -> None:
 
     note_var.trace_add("write", save_note)  # save on every keystroke, not just focus-out
     note_box = card(root)
-    note_box.pack(fill="x", padx=18)
+    note_box.pack(fill="x", padx=PAD)
     note_entry = tk.Entry(note_box, textvariable=note_var, bg=PANEL, fg=FG,
                           insertbackground=FG, relief="flat", font=("Segoe UI", 10))
     note_entry.pack(fill="x", padx=10, pady=8)
     note_entry.bind("<Return>", save_note)
     note_entry.bind("<FocusOut>", save_note)
     note_hint = lbl(root, "", SUB, ("Segoe UI", 8))
-    note_hint.pack(anchor="w", padx=20, pady=(2, 0))
+    note_hint.pack(anchor="w", padx=PAD + 2, pady=(2, 0))
 
     def _apply_note_mode():
         per = state.load().note_mode == "per"
@@ -215,7 +214,7 @@ def run() -> None:
     except Exception:
         _hook_on = False
     ad = tk.Frame(root, bg=BG)
-    ad.pack(fill="x", padx=20, pady=(8, 0))
+    ad.pack(fill="x", padx=PAD, pady=(6, 0))
     lbl(ad, "Auto-detect:", SUB, ("Segoe UI", 9)).pack(side="left")
     lbl(ad, "  ON" if _hook_on else "  OFF",
         ACCENT if _hook_on else SUB, ("Segoe UI", 9, "bold")).pack(side="left")
@@ -224,7 +223,7 @@ def run() -> None:
 
     # ---------- actions (pinned to the bottom so they're never clipped) ----------
     actions = tk.Frame(root, bg=BG)
-    actions.pack(fill="x", padx=18, pady=(8, 14), side="bottom")
+    actions.pack(fill="x", padx=PAD, pady=(8, 12), side="bottom")
     actions.columnconfigure(0, weight=1)
     actions.columnconfigure(1, weight=1)
 
@@ -248,14 +247,14 @@ def run() -> None:
 
     # ---------- detected sessions, with tick boxes (fills middle) ----------
     sess_head = tk.Frame(root, bg=BG)
-    sess_head.pack(fill="x", padx=20, pady=(10, 2))
+    sess_head.pack(fill="x", padx=PAD, pady=(8, 2))
     lbl(sess_head, "SESSIONS TO RESUME", SUB, ("Segoe UI", 8, "bold")).pack(side="left")
     v_sesscount = lbl(sess_head, "", SUB, ("Segoe UI", 8))
     v_sesscount.pack(side="left", padx=6)
 
     def _set_all(ticked: bool):
         st = state.load()
-        dirs = list(st.live_dirs or [])
+        dirs = list(_rendered.get("dirs") or [])  # the folders currently shown
         st.excluded_dirs = [] if ticked else list(dirs)
         state.save_user(st)
         _render_sessions(force=True)
@@ -270,7 +269,7 @@ def run() -> None:
     nonebtn.bind("<Button-1>", lambda _e: _set_all(False))
 
     sess_wrap = card(root)
-    sess_wrap.pack(fill="both", expand=True, padx=18, pady=(0, 2))
+    sess_wrap.pack(fill="both", expand=True, padx=PAD, pady=(0, 2))
     sess_canvas = tk.Canvas(sess_wrap, bg=PANEL, highlightthickness=0, height=132)
     vsb = tk.Scrollbar(sess_wrap, orient="vertical", command=sess_canvas.yview)
     sess_holder = tk.Frame(sess_canvas, bg=PANEL)
@@ -402,57 +401,20 @@ def run() -> None:
             messagebox.showwarning(
                 "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")
 
-    def enter_limit():
-        text = simpledialog.askstring(
-            "Enter limit time",
-            "Paste Claude's limit message, or type a time like '5:30 PM':",
-            parent=root)
-        if not text:
-            return
-        dt = parse_reset(text)
-        if dt:
-            st = state.load()
-            st.reset_at = dt.isoformat()
-            st.limit_text = text
-            st.phase = state.WAITING
-            state.save_runtime(st)
-            messagebox.showinfo(
-                "cloophole",
-                f"Got it — will resume after {dt.astimezone():%I:%M %p on %b %d}.")
-        else:
-            messagebox.showwarning(
-                "cloophole",
-                "Couldn't read a time from that. Try e.g. 'resets at 5:30 PM'.")
-
-    def choose_folder():
-        d = filedialog.askdirectory(
-            title="Pin one folder to resume in (Cancel = use the ticked sessions)")
-        st = state.load()
-        st.work_dir = d or None
-        state.save_user(st)
-
-    def reset_status():
+    def clear_limit():
+        # forget a detected limit and go back to watching (if the auto-detected
+        # reset was wrong or you're not actually limited)
         st = state.load()
         st.phase = state.WATCHING
         st.reset_at = None
         st.limit_text = None
         st.last_error = None
+        st.recheck_at = []
         state.save_runtime(st)
 
-    def stop_watcher():
-        if messagebox.askyesno("cloophole", "Stop watching and close cloophole?"):
-            runner.stop()
-            _cleanup()
-            root.destroy()
-
-    mkbtn(actions, "▶  Resume ticked sessions now", do_resume, accent=True,
-          grid=(0, 0), columnspan=2)
-    mkbtn(actions, "Enter limit time", enter_limit, grid=(1, 0))
-    mkbtn(actions, "Pin a folder", choose_folder, grid=(1, 1))
-    mkbtn(actions, "Reset status", reset_status, grid=(2, 0))
-    mkbtn(actions, "Stop watching", stop_watcher, grid=(2, 1))
-    mkbtn(actions, "Close window", lambda: (_cleanup(), root.destroy()),
-          grid=(3, 0), columnspan=2)
+    mkbtn(actions, "▶  Resume now", do_resume, accent=True, grid=(0, 0), columnspan=2)
+    mkbtn(actions, "Not limited / clear", clear_limit, grid=(1, 0))
+    mkbtn(actions, "Close", lambda: (_cleanup(), root.destroy()), grid=(1, 1))
 
     # ---------- live refresh ----------
     def refresh():
@@ -491,10 +453,10 @@ def run() -> None:
     # Fit the window to its content so nothing clips. The session list scrolls, so
     # height stays bounded; buttons are bottom-pinned as a backstop.
     root.update_idletasks()
-    fit_w = max(520, root.winfo_reqwidth())
-    fit_h = root.winfo_reqheight() + 12
+    fit_w = max(460, root.winfo_reqwidth())
+    fit_h = root.winfo_reqheight() + 10
     root.geometry(f"{fit_w}x{fit_h}")
-    root.minsize(fit_w, 540)
+    root.minsize(fit_w, 420)
     refresh()
     import gc
     gc.collect()  # drop import/build garbage before the window goes idle
