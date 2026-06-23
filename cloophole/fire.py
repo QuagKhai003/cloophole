@@ -100,6 +100,14 @@ def resume(target: Optional[str], queue_note: Optional[str],
         except ValueError:
             return "bad WSL target"
         return None if inject.send_text(pid, text) else "couldn't reach the WSL terminal"
+    if target and str(target).startswith("win:"):   # Windows session, keyed by pid
+        from . import inject
+        text = (queue_note or "").strip() or FALLBACK_NOTE
+        try:
+            pid = int(str(target)[4:])
+        except ValueError:
+            return "bad target"
+        return None if inject.send_text(pid, text) else "couldn't type into the session"
     mode = cfg.get("resume_mode", "inject")
     if mode == "inject":
         return fire_inject(target, queue_note, cfg)
