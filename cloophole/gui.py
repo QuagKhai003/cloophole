@@ -337,7 +337,14 @@ def run() -> None:
             txt.pack(side="left", fill="x", expand=True, pady=4)
             head = tk.Frame(txt, bg=PANEL2)
             head.pack(anchor="w", fill="x")
-            lbl(head, s["folder"], FG, ("Segoe UI", 10, "bold"), bg=PANEL2).pack(side="left")
+            fl = lbl(head, s["folder"], FG, ("Segoe UI", 10, "bold"), bg=PANEL2)
+            fl.pack(side="left")
+            if s.get("kind") == "wsl":  # click the name to flash that tmux pane
+                fl.config(cursor="hand2")
+                fl.bind("<Button-1>", lambda _e, h=s["handle"]:
+                        threading.Thread(target=lambda: __import__(
+                            "cloophole.wsl", fromlist=["highlight"]).highlight(h),
+                            daemon=True).start())
             if s.get("label"):
                 lbl(head, f"  ·  {s['label']}", ACCENT, ("Segoe UI", 8), bg=PANEL2).pack(side="left")
             lbl(txt, s.get("path", key), SUB, ("Segoe UI", 8), bg=PANEL2).pack(anchor="w")

@@ -39,15 +39,15 @@ def list_all(cfg: dict) -> List[dict]:
         })
 
     try:
-        for pane, path in wsl.claude_sessions():
+        for pane, path, where in wsl.claude_sessions():
             folder = PurePosixPath(path).name or path
             out.append({
                 "key": f"wsl:{pane}",         # WSL+tmux: the pane id makes it unique
-                "folder": f"{folder}  {pane}",
+                "folder": f"{folder}  {where}",
                 "path": path,
-                "label": "WSL · tmux",
+                "label": "WSL · tmux · click to flash",
                 "kind": "wsl",
-                "handle": pane,
+                "handle": pane,               # the %id, for send-keys + highlight
             })
         for host_pid, path in wsl.plain_sessions():
             folder = PurePosixPath(path).name or path
