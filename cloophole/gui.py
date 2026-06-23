@@ -163,6 +163,7 @@ def run() -> None:
         st.queue_note = note_var.get().strip() or None
         state.save(st)
 
+    note_var.trace_add("write", save_note)  # save on every keystroke, not just focus-out
     note_box = card(root)
     note_box.pack(fill="x", padx=18)
     note_entry = tk.Entry(note_box, textvariable=note_var, bg=PANEL, fg=FG,
@@ -349,11 +350,10 @@ def run() -> None:
                     s.session_notes = notes
                     state.save(s)
 
+                svar.trace_add("write", lambda *_a, f=_save_sess_note: f())
                 e = tk.Entry(txt, textvariable=svar, bg=PANEL, fg=FG, insertbackground=FG,
                              relief="flat", font=("Segoe UI", 9))
                 e.pack(fill="x", pady=(3, 1))
-                e.bind("<Return>", lambda _e, f=_save_sess_note: f())
-                e.bind("<FocusOut>", lambda _e, f=_save_sess_note: f())
         _update_count()
 
     # ---------- button actions ----------
