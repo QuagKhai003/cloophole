@@ -11,7 +11,9 @@
 @todo     non-default WSL distro / custom tmux socket selection.
 @limits   Windows-only host; needs WSL + a running tmux. Best-effort: any failure
           returns [] / False. A pane's command shows as `claude` or its version
-          string (e.g. 2.1.186) — both are matched.
+          string (e.g. 2.1.186) — both are matched. Plain (non-tmux) pairing of a
+          claude cwd to its Windows wsl.exe host is heuristic (newest root first);
+          reliable with ONE plain terminal, ambiguous with several (use tmux then).
 @affects  Used by sessions.list_all (detect) and fire.resume (inject when key is
           'wsl:<pane>'). Runs wsl.exe via subproc (no console window).
 """
@@ -80,7 +82,9 @@ def _plain_claude_cwds() -> List[str]:
     script = ("for p in $(pgrep -f claude 2>/dev/null); do "
               "grep -qz 'TMUX=' /proc/$p/environ 2>/dev/null || "
               "readlink /proc/$p/cwd 2>/dev/null; done")
-    p = _wsl(["bash", "-lc", script])
+    # bash -c (NOT -lc): a login shell sources the user's profile (nvm/node etc.)
+    # which can take >10s and time us out. pgrep/readlink need no login env.
+    p = _wsl(["bash", "-c", script], timeout=15)
     if not p or p.returncode != 0 or not p.stdout:
         return []
     seen: List[str] = []
@@ -105,9 +109,10 @@ def plain_sessions() -> List[Tuple[int, str]]:
     roots = [pid for pid, (ppid, name) in named.items()
              if (name or "").lower() == "wsl.exe"
              and (named.get(ppid, (0, ""))[1] or "").lower() != "wsl.exe"]
+    roots.sort(reverse=True)  # newest terminal first (a just-opened plain claude)
     out: List[Tuple[int, str]] = []
     for i, cwd in enumerate(plain):
-        pid = roots[i] if i < len(roots) else (roots[0] if roots else None)
+        pid = roots[i] if i < len(roots) else (roots[-1] if roots else None)
         if pid:
             out.append((pid, cwd))
     return out
