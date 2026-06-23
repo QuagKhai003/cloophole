@@ -87,7 +87,9 @@ class _KEY_EVENT_RECORD(ctypes.Structure):
 
 
 class _EVENT_UNION(ctypes.Union):
-    _fields_ = [("KeyEvent", _KEY_EVENT_RECORD), ("_pad", ctypes.c_byte * 20)]
+    # No padding: KEY_EVENT_RECORD is the full union, so INPUT_RECORD stays 20 bytes.
+    # An over-sized record makes WriteConsoleInput fail with err=87 (invalid param).
+    _fields_ = [("KeyEvent", _KEY_EVENT_RECORD)]
 
 
 class _INPUT_RECORD(ctypes.Structure):
