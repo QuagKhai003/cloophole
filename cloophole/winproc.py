@@ -196,6 +196,26 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+def all_procs() -> dict[int, int]:
+    """{pid: parent_pid} for every process — to walk a claude.exe up to its terminal."""
+    if _k32 is None:
+        return {}
+    snap = _k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == wintypes.HANDLE(-1).value or snap == -1:
+        return {}
+    out: dict[int, int] = {}
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        ok = _k32.Process32FirstW(snap, ctypes.byref(entry))
+        while ok:
+            out[entry.th32ProcessID] = entry.th32ParentProcessID
+            ok = _k32.Process32NextW(snap, ctypes.byref(entry))
+    finally:
+        _k32.CloseHandle(snap)
+    return out
+
+
 def session_pids(process_name: str) -> list[tuple[int, Optional[str]]]:
     """[(pid, cwd)] for each live session — so the caller can target the right
     process (e.g. inject the resume into the session whose folder was ticked)."""

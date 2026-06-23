@@ -12,8 +12,10 @@ TYPES the note into the user's existing `claude` session (default `resume_mode=i
 `inject.send_text` does `AttachConsole`+`WriteConsoleInput`. No new window/process — the
 user's ask. The Golden Rule was revised (owner decision): read-ban stands, keystroke-ban
 lifted. Modes: inject/window/headless. CLI `cloophole send "<text>"` for testing.
-50 tests. RISK: the raw WriteConsoleInput path is unverifiable in CI — needs the user to
-confirm it reaches their terminal type.
+50 tests. WriteConsoleInput failed on the user's Windows Terminal (ConPTY) → added a
+clipboard-paste fallback (find terminal window via ancestor walk + EnumWindows,
+SetForegroundWindow, SendInput Ctrl+V + Enter). RISK: still unverifiable in CI — user
+confirms on WT. Limit: paste hits the active tab; daemon may be denied focus.
 
 ## (prior) Active task
 **Visible resume (ADR-0011) — DONE on `main`, pending CI + user verify.**
