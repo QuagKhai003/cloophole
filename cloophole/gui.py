@@ -120,7 +120,7 @@ def run() -> None:
                     _detected["dirs"] = list(dirs)
             except Exception:
                 pass
-            _time.sleep(3)
+            _time.sleep(1.5)
 
     threading.Thread(target=_detect_loop, daemon=True).start()
 
@@ -280,16 +280,15 @@ def run() -> None:
     # a folder read can flake for a tick) can't blink a session in and out. A folder
     # that genuinely closes disappears after _STICKY seconds.
     _rendered = {"dirs": None}
-    _seen: dict[str, int] = {}
-    _ticks = {"n": 0}
-    _STICKY = 22  # refreshes (~22s) — must exceed daemon_tick_sec (15) plus headroom
+    _seen: dict[str, float] = {}
+    _STICKY_SEC = 6.0  # time-based, independent of refresh rate; the detect thread
+                       # already smooths transient empties, so this can be short
 
     def _effective_dirs() -> list:
-        _ticks["n"] += 1
-        now = _ticks["n"]
+        now = _time.monotonic()
         for d in _detected["dirs"] or []:
             _seen[d] = now
-        for d in [d for d, t in _seen.items() if now - t > _STICKY]:
+        for d in [d for d, t in _seen.items() if now - t > _STICKY_SEC]:
             del _seen[d]
         return sorted(_seen)
 
@@ -462,7 +461,7 @@ def run() -> None:
         except Exception:
             pass
         finally:
-            root.after(1000, refresh)
+            root.after(400, refresh)
 
     def _cleanup():
         try:
