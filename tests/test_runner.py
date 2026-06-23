@@ -71,7 +71,9 @@ def test_cmd_open_clean_restarts_before_launch(monkeypatch):
 
 def test_cmd_sessions_lists_dirs(monkeypatch, capsys):
     from cloophole import __main__ as m
-    from cloophole import daemon
+    from cloophole import daemon, winproc
+    monkeypatch.setattr(winproc, "sessions_detail",
+                        lambda n: [(111, "C:/a/proj", "Windows Terminal")])
     monkeypatch.setattr(daemon, "detect_sessions", lambda c: (True, ["C:/a/proj"]))
     m.cmd_sessions([])
     out = capsys.readouterr().out
@@ -80,7 +82,8 @@ def test_cmd_sessions_lists_dirs(monkeypatch, capsys):
 
 def test_cmd_sessions_none(monkeypatch, capsys):
     from cloophole import __main__ as m
-    from cloophole import daemon
+    from cloophole import daemon, winproc
+    monkeypatch.setattr(winproc, "sessions_detail", lambda n: [])
     monkeypatch.setattr(daemon, "detect_sessions", lambda c: (False, []))
     m.cmd_sessions([])
     assert "no live Claude session" in capsys.readouterr().out
@@ -103,6 +106,21 @@ def test_fire_visible_launches_continue_window(monkeypatch, tmp_path):
     assert captured["kw"]["cwd"] == "C:/proj"
     if sys.platform == "win32":
         assert captured["kw"]["creationflags"] == 0x00000010  # CREATE_NEW_CONSOLE
+
+
+def test_host_terminal_picks_window_app_over_shell():
+    from cloophole import winproc
+    # claude(100) -> pwsh(200) -> WindowsTerminal(300) -> explorer(400)
+    named = {
+        100: (200, "claude.exe"),
+        200: (300, "pwsh.exe"),
+        300: (400, "WindowsTerminal.exe"),
+        400: (0, "explorer.exe"),
+    }
+    assert winproc.host_terminal(100, named) == "Windows Terminal"
+    # cmd launched directly (no window app ancestor) -> labelled cmd
+    named2 = {10: (20, "claude.exe"), 20: (30, "cmd.exe"), 30: (0, "explorer.exe")}
+    assert winproc.host_terminal(10, named2) == "cmd"
 
 
 def test_fire_inject_types_into_matching_session(monkeypatch, tmp_path):

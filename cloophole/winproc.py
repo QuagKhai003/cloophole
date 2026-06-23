@@ -222,6 +222,75 @@ def session_pids(process_name: str) -> list[tuple[int, Optional[str]]]:
     return [(pid, process_cwd(pid)) for pid in find_pids(process_name)]
 
 
+# Friendly names for the terminals/shells a claude session may run under. Used to
+# label sessions and to know which injection path fits (console vs paste).
+_TERMINALS = {
+    "windowsterminal.exe": "Windows Terminal",
+    "code.exe": "VS Code",
+    "conemu64.exe": "ConEmu", "conemuc64.exe": "ConEmu",
+    "alacritty.exe": "Alacritty", "wezterm-gui.exe": "WezTerm",
+    "cmd.exe": "cmd",
+    "powershell.exe": "PowerShell", "pwsh.exe": "PowerShell",
+    "bash.exe": "Git Bash", "sh.exe": "Git Bash", "mintty.exe": "mintty",
+    "wsl.exe": "WSL", "wslhost.exe": "WSL",
+    "conhost.exe": "Console",
+}
+# A window-owning terminal app beats an inner shell when both are in the ancestry.
+_WINDOW_APPS = {"windowsterminal.exe", "code.exe", "conemu64.exe",
+                "alacritty.exe", "wezterm-gui.exe", "mintty.exe"}
+
+
+def all_procs_named() -> dict[int, tuple[int, str]]:
+    """{pid: (parent_pid, exe_name)} for every process."""
+    if _k32 is None:
+        return {}
+    snap = _k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == wintypes.HANDLE(-1).value or snap == -1:
+        return {}
+    out: dict[int, tuple[int, str]] = {}
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        ok = _k32.Process32FirstW(snap, ctypes.byref(entry))
+        while ok:
+            out[entry.th32ProcessID] = (entry.th32ParentProcessID, entry.szExeFile)
+            ok = _k32.Process32NextW(snap, ctypes.byref(entry))
+    finally:
+        _k32.CloseHandle(snap)
+    return out
+
+
+def host_terminal(pid: int, named: Optional[dict] = None) -> Optional[str]:
+    """Friendly label of the terminal hosting `pid` (walk its ancestors). The
+    outermost window-owning app (e.g. Windows Terminal) wins over an inner shell."""
+    named = all_procs_named() if named is None else named
+    label = None
+    cur = pid
+    seen: set[int] = set()
+    for _ in range(12):
+        info = named.get(cur)
+        if not info:
+            break
+        ppid, name = info
+        low = (name or "").lower()
+        if low in _TERMINALS:
+            # window app always wins; otherwise take the first shell we see
+            if low in _WINDOW_APPS or label is None:
+                label = _TERMINALS[low]
+        if not ppid or ppid in seen:
+            break
+        seen.add(cur)
+        cur = ppid
+    return label
+
+
+def sessions_detail(process_name: str) -> list[tuple[int, Optional[str], Optional[str]]]:
+    """[(pid, cwd, terminal_label)] for each live session."""
+    named = all_procs_named()
+    return [(pid, process_cwd(pid), host_terminal(pid, named))
+            for pid in find_pids(process_name)]
+
+
 def detect_all(process_name: str) -> tuple[bool, list[str]]:
     """(any_running, unique readable cwds of every live session).
 
