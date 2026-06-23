@@ -51,6 +51,47 @@ class FireResult:
     error: Optional[str] = None
 
 
+def _samepath(a: str, b: str) -> bool:
+    import os
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def fire_inject(work_dir: Optional[str], queue_note: Optional[str],
+                cfg: Optional[dict] = None) -> Optional[str]:
+    """Type the note into the EXISTING Claude session running in `work_dir` (ADR-0012).
+
+    Drives the user's own open `claude` session in place — no new window. Returns None
+    on success or an error string. Windows-only.
+    """
+    cfg = cfg or config.load()
+    if sys.platform != "win32":
+        return "typing into a session is Windows-only"
+    from . import inject, winproc
+    text = (queue_note or "").strip() or FALLBACK_NOTE
+    target = None
+    for pid, cwd in winproc.session_pids(cfg["claude_process_name"]):
+        if cwd and work_dir and _samepath(cwd, work_dir):
+            target = pid
+            break
+    if target is None:
+        return f"no live Claude session in {work_dir}"
+    return None if inject.send_text(target, text) else "couldn't type into the session"
+
+
+def resume(work_dir: Optional[str], queue_note: Optional[str],
+           cfg: Optional[dict] = None) -> Optional[str]:
+    """Resume per the configured mode. Returns None on success, else an error string.
+    `inject` (default) types into the existing session; `window` opens a visible
+    `claude --continue`; anything else runs the headless `fire()`."""
+    cfg = cfg or config.load()
+    mode = cfg.get("resume_mode", "inject")
+    if mode == "inject":
+        return fire_inject(work_dir, queue_note, cfg)
+    if mode == "window":
+        return fire_visible(work_dir, queue_note, cfg)
+    return fire(work_dir, queue_note, cfg).error
+
+
 def fire_visible(work_dir: Optional[str], queue_note: Optional[str],
                  cfg: Optional[dict] = None) -> Optional[str]:
     """Resume in a VISIBLE terminal window so the user can watch Claude work.

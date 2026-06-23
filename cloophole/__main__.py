@@ -12,6 +12,7 @@
   cloophole close                  stop the watcher + close the window
   cloophole status                 show state + countdown
   cloophole sessions               list live Claude sessions (by folder)
+  cloophole send "<text>"          type text into every live Claude session
   cloophole report "<limit text>"  parse reset time, arm -> WAITING
   cloophole queue "<note>"         set what to continue
   cloophole dir <path>             pin one dir (else fire all live sessions)
@@ -95,6 +96,29 @@ def cmd_queue(args: list[str]) -> int:
     state.save(st)
     print(f"queued: {st.queue_note}")
     return 0
+
+
+def cmd_send(args: list[str]) -> int:
+    """Type text into every live Claude session in place (ADR-0012). For testing."""
+    from . import daemon, fire
+    if not args:
+        print('usage: cloophole send "<text>"')
+        return 2
+    text = " ".join(args)
+    _live, dirs = daemon.detect_sessions(config.load())
+    if not dirs:
+        print("no live Claude session with a readable folder.")
+        return 1
+    sent = 0
+    for d in dirs:
+        err = fire.fire_inject(d, text, config.load())
+        if err:
+            print(f"  {d}: {err}")
+        else:
+            print(f"  sent -> {d}")
+            sent += 1
+    print(f"typed into {sent} session(s).")
+    return 0 if sent else 1
 
 
 def cmd_sessions(_args: list[str]) -> int:
@@ -358,6 +382,7 @@ COMMANDS = {
     "close": cmd_close,
     "status": cmd_status,
     "sessions": cmd_sessions,
+    "send": cmd_send,
     "report": cmd_report,
     "arm": cmd_arm,
     "queue": cmd_queue,

@@ -196,6 +196,12 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+def session_pids(process_name: str) -> list[tuple[int, Optional[str]]]:
+    """[(pid, cwd)] for each live session — so the caller can target the right
+    process (e.g. inject the resume into the session whose folder was ticked)."""
+    return [(pid, process_cwd(pid)) for pid in find_pids(process_name)]
+
+
 def detect_all(process_name: str) -> tuple[bool, list[str]]:
     """(any_running, unique readable cwds of every live session).
 

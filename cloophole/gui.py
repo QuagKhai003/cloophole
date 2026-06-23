@@ -312,20 +312,18 @@ def run() -> None:
         if not targets:
             messagebox.showinfo("cloophole", "No sessions are ticked to resume.")
             return
-        # Open each resume in its OWN visible terminal so you watch Claude work
-        # (non-blocking — no waiting on the call).
+        # Resume per the configured mode (default: type the note into the open
+        # session). Non-blocking — no waiting on the call.
         note = state.load().queue_note
-        launched, errs = 0, []
+        done, errs = 0, []
         for d in targets:
-            err = fire.fire_visible(d, note)
+            err = fire.resume(d, note)
             if err:
                 errs.append(err)
             else:
-                launched += 1
-        if launched:
-            messagebox.showinfo(
-                "cloophole",
-                f"Opened {launched} Claude window(s) — watch them continue.")
+                done += 1
+        if done:
+            messagebox.showinfo("cloophole", f"Resumed {done} session(s).")
         else:
             messagebox.showwarning(
                 "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")

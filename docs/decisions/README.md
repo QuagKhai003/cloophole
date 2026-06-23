@@ -19,3 +19,4 @@ Copy `0000-template.md` → `NNNN-<slug>.md` and link it below.
 | 0009 | Clean uninstall: sweep cloophole.exe by name + deregister hook | Accepted — COMPLETE |
 | 0010 | Per-session tick boxes choose where to resume (+ GUI redesign) | Accepted — COMPLETE |
 | 0011 | Resume in a visible window (watch Claude work) | Accepted — COMPLETE |
+| 0012 | Type the resume into the user's existing session (revises Golden Rule) | Accepted — COMPLETE |

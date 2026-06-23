@@ -91,18 +91,19 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
     last_error = None
     relimit_text = None
     fired_ok = False
-    if cfg.get("resume_visible", True):
-        # Open each resume in its own visible window so the user can watch Claude
-        # work (no hidden edits). The re-check probes already confirmed the reset, so
-        # we don't need headless still_limited detection here.
+    mode = cfg.get("resume_mode", "inject")
+    if mode != "headless":
+        # inject (type into the open session) or window (new visible window). The
+        # re-check probes already confirmed the reset, so we don't need headless
+        # still_limited detection here.
         for d in dirs:
-            err = fire.fire_visible(d, st.queue_note, cfg)
+            err = fire.resume(d, st.queue_note, cfg)
             if err:
                 last_error = err
                 log(f"  ERROR in {d or '(cwd)'}: {err}")
             else:
                 fired_ok = True
-                log(f"  opened visible resume in {d or '(cwd)'}")
+                log(f"  resumed ({mode}) {d or '(cwd)'}")
     else:
         for d in dirs:
             res = fire.fire(d, st.queue_note, cfg)

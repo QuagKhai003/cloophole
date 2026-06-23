@@ -3,9 +3,19 @@
 > Single source of truth for the CURRENT moment. Update at the start and end of every
 > session. History goes in `docs/progress/`, not here.
 
-**Last updated:** 2026-06-23 (ADR-0011 — visible resume; watch Claude work)
+**Last updated:** 2026-06-23 (ADR-0012 — inject resume into the open session; Golden Rule revised)
 
 ## Active task
+**Inject resume (ADR-0012) — DONE on `main`, pending CI + user verify.** Resume now
+TYPES the note into the user's existing `claude` session (default `resume_mode=inject`):
+`fire_inject` matches the session by folder (`winproc.session_pids`) and
+`inject.send_text` does `AttachConsole`+`WriteConsoleInput`. No new window/process — the
+user's ask. The Golden Rule was revised (owner decision): read-ban stands, keystroke-ban
+lifted. Modes: inject/window/headless. CLI `cloophole send "<text>"` for testing.
+50 tests. RISK: the raw WriteConsoleInput path is unverifiable in CI — needs the user to
+confirm it reaches their terminal type.
+
+## (prior) Active task
 **Visible resume (ADR-0011) — DONE on `main`, pending CI + user verify.**
 Resume now opens `claude --continue` in a VISIBLE window (`fire.fire_visible`,
 `CREATE_NEW_CONSOLE`, non-blocking) — the user watches the resumed work instead of
