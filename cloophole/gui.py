@@ -5,9 +5,10 @@
           (ticked = resume fired there; default all ticked), and action buttons. The
           background watcher runs as a separate process; this views/controls it via
           the shared state file.
-@done     run(): single-instance Tk window, 1s refresh, phase badge, note field,
+@done     run(): single-instance Tk window, fast refresh, phase badge, note field,
           hook on/off line, scrollable per-session checkboxes (excluded_dirs),
-          resume-selected + limit/folder/reset/stop. Stdlib tkinter only.
+          resume-selected + limit/folder/reset/stop. THE WINDOW IS THE WATCHER: a
+          background thread runs daemon.tick (no separate daemon process). Stdlib only.
 @todo     mac/Linux polish.
 @limits   Needs a display. Headless? use `cloophole daemon`. One window at a time
           (gui.pid). Closing the window leaves the watcher running.
@@ -123,6 +124,23 @@ def run() -> None:
             _time.sleep(1.5)
 
     threading.Thread(target=_detect_loop, daemon=True).start()
+
+    # The WINDOW is the watcher (no separate daemon process): this thread runs the
+    # state-machine tick — read the rate-limit hook signal, count down to the reset,
+    # fire the resume when due. One process = no daemon races/orphans/clobbering.
+    def _watch_loop():
+        while True:
+            try:
+                _daemon.tick(_config.load())
+            except Exception:
+                pass
+            try:
+                interval = max(2, int(_config.load().get("daemon_tick_sec", 5)))
+            except Exception:
+                interval = 5
+            _time.sleep(interval)
+
+    threading.Thread(target=_watch_loop, daemon=True).start()
 
     # ---------- header ----------
     head = tk.Frame(root, bg=BG)
@@ -441,7 +459,6 @@ def run() -> None:
         # Never let one bad refresh kill the loop — always reschedule in `finally`.
         try:
             st = state.load()
-            running = runner.is_running()
             v_status.config(text=_PHASE_PLAIN.get(st.phase, st.phase))
             v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
             if st.reset_at:
@@ -451,7 +468,7 @@ def run() -> None:
             elif v_count.winfo_ismapped():
                 v_count.pack_forget()
             where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
-            meta = (f"Watcher {'running' if running else 'stopped'}   ·   "
+            meta = (f"Watching (this window)   ·   "
                     f"Claude open now: {'yes' if _detected['live'] else 'no'}\n"
                     f"Resume in: {where}")
             if st.last_error:
