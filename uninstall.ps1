@@ -7,7 +7,8 @@ $ErrorActionPreference = "SilentlyContinue"
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\cloophole"
 $ExePath    = Join-Path $InstallDir "cloophole.exe"
-$DataDir    = Join-Path $env:USERPROFILE ".cloophole"
+$DataDir    = Join-Path $env:LOCALAPPDATA "cloophole"          # new home
+$OldDataDir = Join-Path $env:USERPROFILE ".cloophole"          # legacy home
 
 Write-Host "cloophole uninstaller" -ForegroundColor Cyan
 
@@ -38,6 +39,7 @@ if ($userPath -like "*$InstallDir*") {
 
 Remove-Item -Recurse -Force $InstallDir
 Remove-Item -Recurse -Force $DataDir
+Remove-Item -Recurse -Force $OldDataDir
 if (Test-Path $InstallDir) {
     Write-Host "note: $InstallDir is still locked; close any cloophole window and re-run." -ForegroundColor Yellow
 } else {
