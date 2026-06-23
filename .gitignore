@@ -25,3 +25,9 @@ Thumbs.db
 
 # local-only Claude Code slash commands (untracked)
 .claude/commands/phase-resume.md
+
+# local-only: development docs, tests, working notes (kept out of the public repo)
+docs/
+tests/
+CLAUDE.md
+claude-resume-product-plan.md
