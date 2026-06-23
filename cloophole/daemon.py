@@ -248,15 +248,25 @@ def _already_running() -> bool:
     return old != __import__("os").getpid() and winproc.pid_alive(old)
 
 
-def claim_pid() -> bool:
-    """Take the single-instance pid file. False if another daemon already holds it."""
-    if _already_running():
+def _owns_pid() -> bool:
+    """True if this process is the one recorded in the pid file."""
+    try:
+        return int(pid_file().read_text().strip()) == __import__("os").getpid()
+    except (ValueError, OSError):
         return False
+
+
+def claim_pid() -> bool:
+    """FORCE-claim the pid file — the newest daemon always wins. An older
+    (new-build) daemon notices it lost ownership on its next tick and exits, so two
+    daemons can never coexist and clobber each other's state."""
     pid_file().write_text(str(__import__("os").getpid()), encoding="utf-8")
     return True
 
 
 def release_pid() -> None:
+    if not _owns_pid():  # don't delete a newer daemon's pid file
+        return
     try:
         pid_file().unlink()
     except OSError:
@@ -266,12 +276,16 @@ def release_pid() -> None:
 def loop(cfg: dict, stop: "object | None" = None) -> None:
     """Run ticks until `stop` (a threading.Event) is set, or forever.
 
-    Does NOT manage the pid file — `run()` owns that.
+    Does NOT manage the pid file beyond the self-heal ownership check — `run()`
+    owns claiming/releasing it.
     """
     import threading
     stop = stop or threading.Event()
     interval = cfg["daemon_tick_sec"]
     while not stop.is_set():
+        if sys.platform == "win32" and not _owns_pid():
+            log("lost pid ownership to a newer daemon; exiting")
+            return
         try:
             tick(cfg)
         except Exception as e:  # keep the loop alive

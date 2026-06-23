@@ -33,6 +33,16 @@ if ($running) {
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
+# Resolve the FRESH asset URL via the API. The .../releases/latest/download/ alias
+# is served through a CDN that caches the OLD binary, so we ask the API for the
+# current asset's browser_download_url (its id changes each upload -> not cached).
+try {
+    $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/releases/tags/latest" `
+        -Headers @{ "User-Agent" = "cloophole-installer" }
+    $asset = $rel.assets | Where-Object { $_.name -eq "cloophole.exe" } | Select-Object -First 1
+    if ($asset) { $Url = $asset.browser_download_url; Write-Host "  asset  : $Url" }
+} catch { Write-Host "  (couldn't query API; using the latest alias)" -ForegroundColor Yellow }
+
 # --- download with retries (curl.exe is reliable on connection drops) ---------
 Write-Host "downloading..." -ForegroundColor Cyan
 $curl = Join-Path $env:SystemRoot "System32\curl.exe"
