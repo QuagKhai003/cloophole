@@ -89,6 +89,10 @@ def load() -> State:
 
 def save(st: State) -> None:
     st.updated_at = _now_iso()
-    paths.state_file().write_text(
-        json.dumps(asdict(st), indent=2), encoding="utf-8"
-    )
+    # Atomic write (tmp + replace) so a concurrent reader (the daemon) never sees a
+    # half-written file — the GUI now saves on every keystroke.
+    import os
+    f = paths.state_file()
+    tmp = f.with_name(f.name + ".tmp")
+    tmp.write_text(json.dumps(asdict(st), indent=2), encoding="utf-8")
+    os.replace(tmp, f)
