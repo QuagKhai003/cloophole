@@ -11,12 +11,18 @@ cloophole runs `claude --continue` in the recorded directory so the work picks
 itself back up. Windows-first. Full vision: `claude-resume-product-plan.md`.
 
 ## The Golden Rule (never violate)
-**cloophole never touches Claude Code's internals or its visible REPL. It observes
-only via OS process inspection and acts only through the public `claude` CLI.**
-That means: no reading session/transcript files to learn task state, no keystroke
-injection into a live terminal, no scraping Claude Code internal state. The live
-gate is process detection; "what to resume" comes from the user's queue note, not
-from Claude's memory. If a feature needs to cross this line, stop and redesign.
+**cloophole never READS Claude Code's internals. It observes only via OS process
+inspection, and "what to resume" comes from the user's queue note — never from
+Claude's memory/transcripts.** That means: no reading session/transcript files to
+learn task state, no scraping Claude Code internal state. The live gate is process
+detection.
+
+**Action (revised by the owner, ADR-0012):** cloophole MAY type the resume note into
+the user's OWN running `claude` session (`inject` via `WriteConsoleInput`), or spawn
+`claude --continue` in a window/headless. The original "no keystroke injection" ban was
+lifted by explicit owner decision because invisible headless resumes hid what Claude
+did. The READ ban stands. If a feature needs to cross the remaining line (reading
+internals), stop and redesign.
 
 ## Tech stack
 - **Language:** Python 3.10+ (developed on 3.14). **Stdlib only, no third-party deps.**
@@ -37,7 +43,8 @@ cloophole/        # the package — one module per responsibility
   state.py        #   durable state machine record (the source of truth)
   reset_parser.py #   limit text -> UTC reset timestamp
   winproc.py      #   Windows claude.exe detection + PEB cwd read + pid_alive
-  fire.py         #   run `claude --continue` — visible window (default) or headless
+  fire.py         #   resume: inject into the open session / window / headless
+  inject.py       #   type text into an existing claude session (WriteConsoleInput)
   probe.py        #   idle quota probe (opt-in; OFF by default)
   claude_hook.py  #   zero-quota limit auto-detect via Claude StopFailure hook
   subproc.py      #   no-window subprocess wrapper

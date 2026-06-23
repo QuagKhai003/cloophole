@@ -105,6 +105,26 @@ def test_fire_visible_launches_continue_window(monkeypatch, tmp_path):
         assert captured["kw"]["creationflags"] == 0x00000010  # CREATE_NEW_CONSOLE
 
 
+def test_fire_inject_types_into_matching_session(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLOOPHOLE_HOME", str(tmp_path))
+    import importlib
+    from cloophole import config, fire, inject, winproc
+    importlib.reload(config)
+    importlib.reload(fire)
+    monkeypatch.setattr(fire.sys, "platform", "win32")
+    monkeypatch.setattr(winproc, "session_pids",
+                        lambda name: [(111, "C:/a"), (222, "C:/b")])
+    sent = {}
+    monkeypatch.setattr(inject, "send_text",
+                        lambda pid, text, **k: (sent.update(pid=pid, text=text), True)[1])
+    err = fire.fire_inject("C:/b", "continue your work")
+    assert err is None
+    assert sent["pid"] == 222                       # the session whose folder matched
+    assert "continue your work" in sent["text"]
+    # no matching session -> a clear error, nothing sent
+    assert "no live Claude session" in fire.fire_inject("C:/zzz", "x")
+
+
 def test_gui_helpers():
     from cloophole import gui, state
     st = state.State(phase=state.WAITING, reset_at="2099-01-01T00:00:00+00:00")

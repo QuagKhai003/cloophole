@@ -18,11 +18,11 @@ def env(tmp_path, monkeypatch):
 
 def _cfg():
     # These tests exercise the headless fire engine (still_limited re-arm, dir
-    # selection), which lives behind resume_visible=False; the visible path is
-    # covered separately (test_runner.test_fire_visible_*).
+    # selection), which lives behind resume_mode="headless"; the inject/window paths
+    # are covered separately (test_runner.test_fire_*).
     from cloophole import config
     cfg = config.load()
-    cfg["resume_visible"] = False
+    cfg["resume_mode"] = "headless"
     return cfg
 
 
@@ -105,19 +105,19 @@ def test_fires_in_all_session_dirs(env, monkeypatch):
     assert out.phase == state.WATCHING
 
 
-def test_visible_resume_is_the_default(env, monkeypatch):
+def test_default_resume_dispatches_per_dir(env, monkeypatch):
     daemon, state = env
     monkeypatch.setattr(daemon, "detect_sessions", lambda cfg: (True, ["C:/a", "C:/b"]))
-    opened = []
-    monkeypatch.setattr(daemon.fire, "fire_visible",
-                        lambda d, note, cfg: (opened.append(d), None)[1])
+    done = []
+    monkeypatch.setattr(daemon.fire, "resume",
+                        lambda d, note, cfg: (done.append(d), None)[1])
     from cloophole import config
-    cfg = config.load()  # resume_visible defaults True
+    cfg = config.load()  # resume_mode defaults "inject"
     st = state.State(phase=state.WAITING,
                      reset_at=(datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat())
     state.save(st)
     out = daemon.tick(cfg)
-    assert opened == ["C:/a", "C:/b"]  # a visible window per ticked dir
+    assert done == ["C:/a", "C:/b"]  # resume() called per ticked dir
     assert out.phase == state.WATCHING
 
 
