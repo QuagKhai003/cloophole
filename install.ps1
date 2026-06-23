@@ -21,14 +21,16 @@ Write-Host "  source : $Url"
 Write-Host "  target : $ExePath"
 
 # --- stop EVERY running cloophole so the exe is unlocked and no old build lingers
-$running = Get-Process cloophole -ErrorAction SilentlyContinue
-if ($running) {
-    Write-Host "stopping $($running.Count) running cloophole process(es)..." -ForegroundColor Yellow
-    $running | Stop-Process -Force -ErrorAction SilentlyContinue
-    for ($i = 0; $i -lt 20; $i++) {
-        if (-not (Get-Process cloophole -ErrorAction SilentlyContinue)) { break }
-        Start-Sleep -Milliseconds 300
-    }
+# (the exe AND any python/vbs daemon left by older builds), but never this shell
+Write-Host "stopping any running cloophole..." -ForegroundColor Yellow
+Get-CimInstance Win32_Process | Where-Object {
+    $_.ProcessId -ne $PID -and
+    $_.Name -in @('cloophole.exe', 'python.exe', 'pythonw.exe', 'wscript.exe', 'cscript.exe') -and
+    $_.CommandLine -like '*cloophole*'
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+for ($i = 0; $i -lt 20; $i++) {
+    if (-not (Get-Process cloophole -ErrorAction SilentlyContinue)) { break }
+    Start-Sleep -Milliseconds 300
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
@@ -77,5 +79,12 @@ try { $ver = (& $ExePath version 2>$null | Out-String).Trim() } catch {}
 
 Write-Host ""
 Write-Host "installed. $ver" -ForegroundColor Green
-Write-Host "Run:  " -NoNewline; Write-Host "cloophole open" -ForegroundColor Yellow
-Write-Host "(if 'cloophole' isn't found, open a new terminal first.)"
+
+# --- launch it: fresh install OR update both end with the app running ----------
+Write-Host "opening cloophole..." -ForegroundColor Cyan
+try { & $ExePath open | Out-Null } catch {}
+
+Write-Host ""
+Write-Host "Done. The cloophole window is open and watching." -ForegroundColor Green
+Write-Host "Restart Claude Code once so it loads the zero-quota limit hook."
+Write-Host "(CLI also available as 'cloophole' in a new terminal.)"

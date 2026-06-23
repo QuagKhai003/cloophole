@@ -1,58 +1,68 @@
 # cloophole
 
-Auto-resume your Claude Code work when your usage quota resets — Windows.
+**Auto-resume your Claude Code work when your usage limit resets.** Windows.
 
-You hit the limit and walk away. cloophole **watches for the limit on its own**, and
-when the window reopens with a `claude` session running, it runs `claude --continue`
-for you so the work picks itself back up. A hidden background watcher does the work;
-you see and control it from a small **desktop window**.
+You hit the limit and walk away. cloophole watches for the reset on its own, and
+the moment it clears it types your message straight into your open `claude`
+session so the work picks itself back up. No babysitting, no lost momentum.
+
+- 🪟 **Just a window.** One small desktop app — it *is* the watcher. No background
+  daemon, no tray, no service.
+- 🎯 **Per-session control.** Lists every live Claude session with a tick box and
+  its own message. Resume all, or pick which ones.
+- 🧠 **Zero-quota detection.** Notices the limit via a Claude hook — costs no quota.
+- 🐧 **WSL + tmux aware.** Drives Claude in plain WSL *and* individual tmux panes
+  (per-pane `send-keys`), not just native Windows terminals.
+- 🖱️ **Click to find.** Click any session to bring its terminal to the front
+  (tmux panes flash so you see which split is which).
+
+---
 
 ## Install
 
-In PowerShell — no admin, no Python:
+PowerShell — no admin, no Python:
 
 ```powershell
 irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/install.ps1 | iex
 ```
 
-Then:
+That's the **only command you ever run** — the same line **installs, updates, and
+launches**. It stops any old copy, fetches the latest build, and opens the window.
 
-```powershell
-cloophole open
-```
-
-`open` starts the watcher in the background and opens the **cloophole window**. The
-watcher keeps running even if you close the window or the terminal — run
-`cloophole open` again anytime to reopen the window.
+> First time only: restart Claude Code once so it loads the zero-quota limit hook.
 
 ## Using it
 
-The window shows live plain-language status and a button for each action:
+The window shows live status and your detected Claude sessions:
 
-- **Resume now** — continue your Claude work right now
-- **What to resume** — a note telling it what to continue (blank = pick up where you left off)
-- **Enter limit time** — if you know when it resets (e.g. "5:30 PM")
-- **Auto-detect** — let it find the limit on its own (on by default)
-- **Choose folder** — resume in one project (default: every open Claude window)
-- **Reset status** / **Stop watching** / **Close window**
+1. **Type a message** — what Claude should do when it resumes (blank = "pick up
+   where you left off"). Toggle **one message for all** ↔ **per-session messages**.
+2. **Tick the sessions** to resume (all ticked by default; untick to skip).
+3. Walk away. When your limit resets, cloophole types the message into each ticked
+   session automatically.
 
-**Auto-detect is on by default:** the watcher quietly checks for the limit every ~30
-min and sets itself up when it appears — you don't need to enter anything. (Each check
-costs a tiny bit of quota; turn it off in the window if you'd rather enter limits
-yourself.)
+Buttons: **Resume now** (do it immediately) · **Reset the detected time limit**
+(if it wrongly thinks you're limited) · **Close**.
 
-Same actions exist as commands, e.g. `cloophole report "resets at 5:30 PM"`,
-`cloophole queue "finish the refactor"`, `cloophole status`.
+Keep the window open (minimized is fine) for it to keep watching.
 
-## Stop / uninstall
+**Sessions list:** each row shows the folder + a unique tag — `pid 1234` for
+Windows / plain WSL, `w0.p2` for tmux panes. Click a row to surface its terminal.
 
-```powershell
-cloophole close       # stop the background watcher
-cloophole uninstall   # stop + remove everything (exe, PATH entry, app data)
-```
+CLI equivalents exist too: `cloophole sessions`, `cloophole status`,
+`cloophole open`, `cloophole close`.
 
-Or uninstall via the web:
+## Uninstall
+
+One line — removes everything (the exe, PATH entry, the Claude hook, app data, and
+any leftover processes):
 
 ```powershell
 irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 | iex
 ```
+
+---
+
+cloophole only acts through the public `claude` CLI and OS process inspection — it
+never reads Claude Code's internal files. What to resume comes from *your* message,
+not from Claude's memory.
