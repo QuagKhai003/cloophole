@@ -18,7 +18,8 @@ from . import paths
 DEFAULTS: dict[str, Any] = {
     "claude_path": "claude",        # executable name or full path
     "permission_mode": "acceptEdits",  # non-interactive; headless can't confirm
-    "daemon_tick_sec": 15,          # main loop cadence
+    "daemon_tick_sec": 5,           # main loop cadence — snappy: picks up the hook
+                                    # signal / reset / your GUI edits within ~5s
     "poll_enabled": False,          # OFF by default: the `claude -p` probe spends
                                     # your quota every interval even when you're not
                                     # limited. Opt in explicitly (`poll on`) or prefer
