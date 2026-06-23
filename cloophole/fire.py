@@ -7,7 +7,10 @@
 @todo     harden still_limited beyond text matching (Phase 6, B3).
 @limits   Headless needs permission_mode=acceptEdits or it blocks (§9.5).
           still_limited is text-based (BUGS B3).
-@affects  Called by daemon._do_fire and CLI fire-now. FireResult in DATA_MODEL.
+@affects  resume(dir,note) dispatches on config.resume_mode -> fire_inject /
+          fire_visible / fire (headless). CALLERS: gui.do_resume, daemon._do_fire,
+          CLI fire-now/send. USES: winproc.session_pids (dir->pid), inject.send_text,
+          subproc.run, reset_parser.is_limit_message. FireResult in DATA_MODEL.
 
 Per product plan §3: we do NOT keystroke-inject into the visible REPL. We run
 `claude -p --continue` in the recorded directory; --continue resumes the most

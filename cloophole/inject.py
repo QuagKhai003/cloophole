@@ -10,7 +10,10 @@
 @limits   Windows-only. Paste targets the terminal's ACTIVE tab — if the session is in
           a background tab of a multi-tab window it can't be singled out. Background
           callers (daemon) may be denied SetForegroundWindow by Windows' focus lock.
-@affects  Called by fire.fire_inject. Uses winproc.session_pids / all_procs.
+@affects  send_text/diagnose CALLED BY fire.fire_inject + CLI `send`. USES
+          winproc.all_procs_named (ancestor walk -> terminal window). NOTE: the
+          console-input path FreeConsole()s, detaching the CALLER's console — callers
+          that print after (CLI) must print/flush first (see __main__.cmd_send).
 """
 
 from __future__ import annotations

@@ -11,8 +11,11 @@
 @todo     mac/Linux polish.
 @limits   Needs a display. Headless? use `cloophole daemon`. One window at a time
           (gui.pid). Closing the window leaves the watcher running.
-@affects  Launched by CLI `_gui` (spawned by `open`). Reuses state, config, fire,
-          daemon, runner, reset_parser, claude_hook.
+@affects  Launched by CLI `_gui` (spawned by runner from `open`). READS via a self
+          thread: winproc.sessions_detail (dirs + terminal label). WRITES state
+          (queue_note, excluded_dirs ticks, work_dir pin). Resume -> fire.resume per
+          ticked dir. Also: claude_hook.hook_installed (status line), runner.stop.
+          Changing state/config fields or fire.resume's signature affects this file.
 """
 
 from __future__ import annotations

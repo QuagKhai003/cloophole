@@ -7,7 +7,10 @@
           claim_pid/release_pid/loop/run (single-instance background watcher).
 @todo     non-Windows detect (P5).
 @limits   detect_sessions returns (False, []) off Windows in this build.
-@affects  Reads/writes state; calls winproc.detect_all + fire.fire + probe.probe.
+@affects  Reads/writes state; calls winproc.detect_all, claude_hook.read_signal
+          (hook auto-detect), probe.probe (recheck), fire.resume (inject/window) or
+          fire.fire (headless). _fire_dirs honors state.work_dir pin / excluded_dirs
+          ticks / hook_dir fallback. CALLED BY: runner (spawns `daemon`), CLI daemon.
           Cadence = config daemon_tick_sec. Transitions documented in DATA_MODEL.
 
 Transitions (product plan §7):

@@ -7,7 +7,10 @@
 @todo     mac/Linux equivalents (Phase 5, ADR-0003); exclude own child PID (B2).
 @limits   Windows-only; PEB offsets are 64-bit (see BUGS B1). Best-effort: any
           failure returns None and the caller falls back to configured work_dir.
-@affects  Imported by daemon.detect_session. Config key claude_process_name.
+@affects  detect_all -> daemon.detect_sessions (live gate + dirs). session_pids +
+          host_terminal/sessions_detail -> fire.fire_inject (dir->pid) + gui session
+          list + CLI sessions. all_procs/all_procs_named/list_procs -> runner.kill_all
+          (sweep) + inject._terminal_hwnd (ancestor walk). Config claude_process_name.
 
 Two jobs, both via ctypes (zero third-party deps):
   1. Is any `claude` process running?  -> gate firing.
