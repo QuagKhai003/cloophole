@@ -36,6 +36,7 @@ FILE_SHARE_READ = 0x00000001
 FILE_SHARE_WRITE = 0x00000002
 OPEN_EXISTING = 3
 INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+ATTACH_PARENT_PROCESS = 0xFFFFFFFF
 KEY_EVENT = 0x0001
 VK_RETURN = 0x0D
 VK_CONTROL = 0x11
@@ -98,6 +99,8 @@ def _write_console_input(pid: int, text: str, submit: bool) -> bool:
         if handle and handle != INVALID_HANDLE_VALUE:
             _k32.CloseHandle(handle)
         _k32.FreeConsole()
+        # Re-attach to the caller's console so later prints/CLI output keep working.
+        _k32.AttachConsole(ATTACH_PARENT_PROCESS)
 
 
 # ---- clipboard-paste path (Windows Terminal / VS Code / ConPTY) ------------
@@ -217,6 +220,7 @@ def diagnose(pid: int) -> dict:
         return info
     from . import winproc
     named = winproc.all_procs_named()
+    ppid_only = {p: v[0] for p, v in named.items()}
     cur, seen = pid, set()
     for _ in range(12):
         node = named.get(cur)
@@ -228,7 +232,7 @@ def diagnose(pid: int) -> dict:
             break
         seen.add(cur)
         cur = ppid
-    chain_pids = _ancestors(pid, named)
+    chain_pids = _ancestors(pid, ppid_only)
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def _cb(hwnd, _lp):
@@ -247,20 +251,23 @@ def diagnose(pid: int) -> dict:
     return info
 
 
-def send_text(pid: int, text: str, submit: bool = True) -> bool:
+def send_text(pid: int, text: str, submit: bool = True) -> str:
     """Put `text` (+ Enter) into the console of process `pid`. Never raises.
 
-    Tries classic console input first (conhost); falls back to clipboard paste +
-    Ctrl+V (Windows Terminal / VS Code / ConPTY).
+    Returns the method that worked: "console" (WriteConsoleInput, classic conhost),
+    "paste" (clipboard + Ctrl+V, Windows Terminal / VS Code), or "" on failure. The
+    return is truthy on success so callers can `if send_text(...)`.
     """
     if _k32 is None or not pid:
-        return False
+        return ""
     try:
         if _write_console_input(pid, text, submit):
-            return True
+            return "console"
     except Exception:
         pass
     try:
-        return _paste_into(pid, text, submit)
+        if _paste_into(pid, text, submit):
+            return "paste"
     except Exception:
-        return False
+        pass
+    return ""

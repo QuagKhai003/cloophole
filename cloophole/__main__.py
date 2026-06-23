@@ -144,9 +144,12 @@ def cmd_send(args: list[str]) -> int:
         print(f"   windows: {d['windows'] or 'NONE found in ancestry'}")
         print(f"   hwnd:    {d['hwnd']}")
     sys.stdout.flush()
-    sent = sum(1 for pid, _c, _t in detail if inject.send_text(pid, text))
+    results = [(cwd, inject.send_text(pid, text)) for pid, cwd, _t in detail]
+    sent = sum(1 for _c, mode in results if mode)
     try:
-        print(f"\ntyped into {sent} session(s).")
+        for cwd, mode in results:
+            print(f"  {cwd} -> {('via ' + mode) if mode else 'FAILED'}")
+        print(f"typed into {sent} session(s).")
     except OSError:
         pass
     return 0 if sent else 1
