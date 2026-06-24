@@ -20,6 +20,34 @@ if (Test-Path $ExePath) {
     Start-Sleep -Milliseconds 300
 }
 
+# 1b) strip our statusLine from EVERY WSL distro's Claude settings, DIRECTLY (no
+# dependence on the exe still existing). Edits ~/.claude/settings.json via the \\wsl$
+# path, keeping the user's other settings.
+try {
+    $distros = @()
+    try {
+        $distros = (wsl.exe -l -q 2>$null) | ForEach-Object { ($_ -replace "`0", "").Trim() } |
+            Where-Object { $_ }
+    } catch {}
+    if (-not $distros) { $distros = @("") }   # "" = default distro
+    foreach ($d in $distros) {
+        try {
+            if ($d) { $sp = wsl.exe -d $d sh -c 'wslpath -w "$HOME/.claude/settings.json" 2>/dev/null' }
+            else    { $sp = wsl.exe       sh -c 'wslpath -w "$HOME/.claude/settings.json" 2>/dev/null' }
+            $sp = ($sp | Out-String).Trim()
+            if ($sp -and (Test-Path $sp)) {
+                $j = Get-Content $sp -Raw | ConvertFrom-Json
+                if ($j.statusLine -and ("$($j.statusLine.command)" -like '*statusline*')) {
+                    $j.PSObject.Properties.Remove('statusLine')
+                    [IO.File]::WriteAllText($sp, ($j | ConvertTo-Json -Depth 30))
+                    $label = if ($d) { $d } else { 'default' }
+                    Write-Host "removed WSL statusLine ($label)" -ForegroundColor Green
+                }
+            }
+        } catch {}
+    }
+} catch {}
+
 # 2) kill EVERY cloophole runner (exe + python + pythonw + vbs host), not this shell
 Write-Host "stopping every cloophole process..." -ForegroundColor Yellow
 $runners = Get-CimInstance Win32_Process | Where-Object {
