@@ -12,7 +12,9 @@ Especially useful when you only just got 20$ subscription from Anthropic
   daemon, no tray, no service.
 - 🎯 **Per-session control.** Lists every live Claude session with a tick box and
   its own message. Resume all, or pick which ones.
-- 🧠 **Zero-quota detection.** Notices the limit via a Claude hook — costs no quota.
+- 🧠 **Zero-quota detection + live usage.** Notices the limit via a Claude hook, and
+  reads Claude's statusLine to show your **real 5-hour reset countdown + usage %**
+  *before* you hit the wall — no quota spent.
 - 🐧 **WSL + tmux aware.** Drives Claude in plain WSL *and* individual tmux panes
   (per-pane `send-keys`), not just native Windows terminals.
 - 🖱️ **Click to find.** Click any session to bring its terminal to the front

@@ -23,6 +23,7 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from . import fire, state
 from .paths import gui_pid_file
@@ -58,8 +59,7 @@ _PHASE_COLOR = {
 }
 
 
-def _countdown(st: state.State) -> str:
-    dt = st.reset_dt()
+def _fmt_until(dt: Optional[datetime]) -> str:
     if not dt:
         return "-"
     secs = int((dt - datetime.now(timezone.utc)).total_seconds())
@@ -68,6 +68,19 @@ def _countdown(st: state.State) -> str:
     h, rem = divmod(secs, 3600)
     m, s = divmod(rem, 60)
     return f"{h}h {m:02d}m {s:02d}s" if h else f"{m}m {s:02d}s"
+
+
+def _countdown(st: state.State) -> str:
+    return _fmt_until(st.reset_dt())
+
+
+def _iso_dt(iso: Optional[str]) -> Optional[datetime]:
+    if not iso:
+        return None
+    try:
+        return datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return None
 
 
 def run() -> None:
@@ -489,20 +502,41 @@ def run() -> None:
         # Never let one bad refresh kill the loop — always reschedule in `finally`.
         try:
             st = state.load()
+            from . import statusline as _sl
+            info = _sl.read_status()
+            win_dt = _iso_dt(info.get("window_reset_at")) if info else None
+            usage = (f"{info['used_pct']:.0f}% of 5h used"
+                     if info and "used_pct" in info else None)
+
             status_txt = _PHASE_PLAIN.get(st.phase, st.phase)
             if st.phase == state.WAITING and getattr(st, "manual_reset", False):
                 status_txt = "Counting down to your reset"
+            # Live 5h countdown from Claude's statusLine (before any limit), unless we're
+            # already counting down to an actual limit reset.
+            show_window = (st.phase == state.WATCHING and win_dt
+                           and win_dt > datetime.now(timezone.utc))
+            if show_window and usage:
+                status_txt = f"Watching · {usage}"
             v_status.config(text=status_txt)
             v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
+
+            count_text = None
             if st.reset_at:
-                v_count.config(text=_countdown(st))
+                count_text = _countdown(st)            # actual/typed reset
+            elif show_window:
+                count_text = _fmt_until(win_dt)         # live 5h window reset
+            if count_text is not None:
+                v_count.config(text=count_text)
                 if not v_count.winfo_ismapped():
                     v_count.pack(anchor="w", padx=16, before=v_meta)
             elif v_count.winfo_ismapped():
                 v_count.pack_forget()
+
             where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
-            meta = (f"Watching (this window)   ·   "
-                    f"Claude open now: {'yes' if _detected['live'] else 'no'}\n"
+            line1 = "Watching (this window)"
+            if show_window and win_dt:
+                line1 = f"5h quota resets {win_dt.astimezone().strftime('%I:%M %p').lstrip('0')}"
+            meta = (f"{line1}   ·   Claude open now: {'yes' if _detected['live'] else 'no'}\n"
                     f"Resume in: {where}")
             if st.last_error:
                 meta += f"\nLast problem: {st.last_error}"
