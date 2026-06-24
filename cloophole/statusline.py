@@ -7,11 +7,13 @@ zero quota, BEFORE any limit is hit (ADR-0014).
           status.json (the window reads it for a live countdown + % long before a limit)
           and prints a small status line. Public statusLine API — Claude hands us the
           data, we read no transcript/internal files (Golden Rule, like the hook).
-@done     parse/write/read/render; install/uninstall (settings.json, no clobber).
-@todo     —
-@limits   Pro/Max only; populated after the first API response while Claude runs. Off
-          Windows the settings path still works. We never overwrite a user's own
-          statusLine command.
+@done     parse/write/read/render (UNBRANDED — shows in every project's status bar);
+          install/uninstall for BOTH the Windows ~/.claude AND the default WSL distro's
+          ~/.claude (via the \\wsl$ path, command runs our exe through WSL interop), so a
+          WSL-only setup still gets the reset time. Never clobbers a user's statusLine.
+@todo     non-default WSL distros.
+@limits   Pro/Max only; populated after the first API response while Claude runs. The
+          WSL command runs our exe per turn via interop (heavier) — `hook off` removes it.
 @affects  CLI `statusline` (fast path) writes status.json; gui reads it; daemon prefers
           its window_reset_at for an accurate limit reset. Shares settings_path() with
           claude_hook.
@@ -79,9 +81,11 @@ def read_status() -> Optional[dict]:
 
 
 def render(info: Optional[dict]) -> str:
-    """The one-line status string Claude shows (doubles as a usage readout)."""
+    """The one-line status Claude shows. UNBRANDED on purpose — it appears in every
+    project's status bar, so it reads as a plain usage gauge, not an app name. Blank
+    when there's no usage data (free tier / before the first response)."""
     if not info:
-        return "cloophole"
+        return ""
     parts = []
     if "used_pct" in info:
         parts.append(f"5h {info['used_pct']:.0f}%")
@@ -92,7 +96,7 @@ def render(info: Optional[dict]) -> str:
             parts.append("resets " + dt.strftime("%I:%M %p").lstrip("0"))
         except ValueError:
             pass
-    return "cloophole · " + " · ".join(parts) if parts else "cloophole"
+    return " · ".join(parts)
 
 
 # ---- settings.json registration (shares claude_hook.settings_path) ----------
@@ -136,4 +140,75 @@ def uninstall_statusline() -> bool:
         data.pop("statusLine", None)
         claude_hook._save(p, data)
         return True
+    return False
+
+
+# ---- WSL Claude: its settings live INSIDE the distro, and it can't run a Windows
+# exe path directly. We write the distro's ~/.claude/settings.json (reachable from
+# Windows via the \\wsl$ path) with a command that runs OUR exe through WSL interop
+# (/mnt/c/...), feeding the SAME shared status.json. So a WSL-only setup still gets
+# the real reset time. ---------------------------------------------------------
+
+from pathlib import Path
+import sys
+
+
+def _wsl_settings_path() -> Optional[Path]:
+    """Windows path to the default WSL distro's ~/.claude/settings.json, or None."""
+    from . import wsl
+    out = wsl.bash('wslpath -w "$HOME/.claude" 2>/dev/null')
+    if not out or not out.strip():
+        return None
+    return Path(out.strip()) / "settings.json"
+
+
+def _wsl_command() -> Optional[str]:
+    """The statusLine command for WSL: our Windows exe via its /mnt path + statusline.
+    Only meaningful in the frozen exe (dev installs have no shippable command)."""
+    if not getattr(sys, "frozen", False):
+        return None
+    from . import wsl
+    out = wsl.bash(f'wslpath -u "{sys.executable}" 2>/dev/null')
+    if not out or not out.strip():
+        return None
+    return f"'{out.strip()}' statusline"
+
+
+def install_statusline_wsl() -> bool:
+    """Register our statusLine in the default WSL distro's Claude settings. Best-effort;
+    never clobbers a user's own WSL statusLine. Returns True if we wrote it."""
+    cmd = _wsl_command()
+    if not cmd:
+        return False
+    p = _wsl_settings_path()
+    if not p:
+        return False
+    from . import claude_hook
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        data = claude_hook._load(p)
+        existing = data.get("statusLine")
+        if existing and "statusline" not in ((existing or {}).get("command") or ""):
+            return False
+        data["statusLine"] = {"type": "command", "command": cmd, "padding": 0}
+        claude_hook._save(p, data)
+        return True
+    except OSError:
+        return False
+
+
+def uninstall_statusline_wsl() -> bool:
+    p = _wsl_settings_path()
+    if not p or not p.exists():
+        return False
+    from . import claude_hook
+    try:
+        data = claude_hook._load(p)
+        sl = data.get("statusLine") or {}
+        if "statusline" in (sl.get("command") or ""):
+            data.pop("statusLine", None)
+            claude_hook._save(p, data)
+            return True
+    except OSError:
+        pass
     return False

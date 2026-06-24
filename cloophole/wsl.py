@@ -23,7 +23,7 @@ from __future__ import annotations
 import base64
 import re
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from . import subproc
 
@@ -46,6 +46,15 @@ def _wsl(args: list[str], timeout: int = 10):
 def available() -> bool:
     p = _wsl(["tmux", "list-panes", "-a", "-F", "#{pane_id}"], timeout=6)
     return bool(p and p.returncode == 0)
+
+
+def bash(script: str, timeout: int = 15) -> Optional[str]:
+    """Run a bash `script` in the default distro and return stdout (None on failure).
+    base64-wraps it so $()/$VAR survive the Windows -> wsl.exe -> bash arg mangling."""
+    import base64 as _b64
+    b64 = _b64.b64encode(script.encode()).decode()
+    p = _wsl(["bash", "-c", f"echo {b64} | base64 -d | bash"], timeout=timeout)
+    return p.stdout if (p and p.returncode == 0) else None
 
 
 def claude_sessions() -> List[Tuple[str, str, str]]:
