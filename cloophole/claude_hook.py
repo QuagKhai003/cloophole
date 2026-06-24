@@ -9,9 +9,10 @@
           user's Claude settings.json), record_signal (write), read_signal/
           clear_signal (daemon side).
 @todo     surface install state in the GUI; macOS/Linux paths.
-@limits   The hook reports THAT a limit hit (+ its cwd), not the reset time —
-          downstream estimates the window. settings.json is the user's public
-          config; we only touch our own entry.
+@limits   The hook reports THAT a limit hit (+ its cwd); record_signal tries to
+          parse a reset time out of the payload too. If absent, the daemon probes
+          once (probe_on_limit) for the real reset, else estimates the window.
+          settings.json is the user's public config; we only touch our own entry.
 @affects  CLI `limit-signal`/`hook`; consumed by daemon.tick. Writes
           ~/.cloophole/limit-signal.json and ~/.claude/settings.json.
 """
@@ -138,8 +139,18 @@ def record_signal(stdin_text: Optional[str] = None) -> None:
                 cwd = data.get("cwd")
         except (json.JSONDecodeError, ValueError):
             pass
+        # If Claude put a reset time anywhere in the payload, grab it (zero quota) so
+        # the countdown is the REAL reset, not a worst-case estimate.
+        reset_at = None
+        try:
+            from .reset_parser import parse_reset
+            dt = parse_reset(raw or "")
+            if dt:
+                reset_at = dt.isoformat()
+        except Exception:
+            pass
         sig = {"ts": datetime.now(timezone.utc).isoformat(),
-               "cwd": cwd, "source": HOOK_MATCHER}
+               "cwd": cwd, "source": HOOK_MATCHER, "reset_at": reset_at}
         signal_file().write_text(json.dumps(sig), encoding="utf-8")
     except Exception:
         pass
