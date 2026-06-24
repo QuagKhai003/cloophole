@@ -80,23 +80,42 @@ def read_status() -> Optional[dict]:
         return None
 
 
-def render(info: Optional[dict]) -> str:
-    """The one-line status Claude shows. UNBRANDED on purpose — it appears in every
-    project's status bar, so it reads as a plain usage gauge, not an app name. Blank
-    when there's no usage data (free tier / before the first response)."""
-    if not info:
-        return ""
+def folder_of(blob: Optional[str]) -> Optional[str]:
+    """This session's folder name from the statusLine JSON (workspace.current_dir or
+    cwd) — so each terminal's status bar shows its own project."""
+    if not blob:
+        return None
+    try:
+        data = json.loads(blob)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+    ws = (data or {}).get("workspace") or {}
+    cwd = ws.get("current_dir") or data.get("cwd")
+    if not cwd:
+        return None
+    import os
+    return os.path.basename(str(cwd).rstrip("/\\")) or str(cwd)
+
+
+def render(info: Optional[dict], folder: Optional[str] = None) -> str:
+    """The one-line status Claude shows. UNBRANDED — it appears in every project's
+    status bar, so it reads as '<folder> · usage', not an app name. Blank when there's
+    neither a folder nor usage data."""
     parts = []
-    if "used_pct" in info:
-        parts.append(f"5h {info['used_pct']:.0f}%")
-    rt = info.get("window_reset_at")
-    if rt:
-        try:
-            dt = datetime.fromisoformat(rt).astimezone()
-            parts.append("resets " + dt.strftime("%I:%M %p").lstrip("0"))
-        except ValueError:
-            pass
-    return " · ".join(parts)
+    if info:
+        if "used_pct" in info:
+            parts.append(f"5h {info['used_pct']:.0f}%")
+        rt = info.get("window_reset_at")
+        if rt:
+            try:
+                dt = datetime.fromisoformat(rt).astimezone()
+                parts.append("resets " + dt.strftime("%I:%M %p").lstrip("0"))
+            except ValueError:
+                pass
+    usage = " · ".join(parts)
+    if folder and usage:
+        return f"{folder} · {usage}"
+    return folder or usage
 
 
 # ---- settings.json registration (shares claude_hook.settings_path) ----------
