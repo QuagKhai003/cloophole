@@ -520,7 +520,8 @@ def cmd_statusline(_args: list[str]) -> int:
             statusline.write_status(info)
         except Exception:
             pass
-    print(statusline.render(info or statusline.read_status()))
+    folder = statusline.folder_of(blob)
+    print(statusline.render(info or statusline.read_status(), folder))
     return 0
 
 
