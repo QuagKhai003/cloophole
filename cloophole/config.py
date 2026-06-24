@@ -34,6 +34,12 @@ DEFAULTS: dict[str, Any] = {
                                     # show the worst-case +window estimate until a recheck.
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
+    "auto_refetch": True,           # 1-hour loop: probe periodically to (a) catch the
+                                    # limit on our own as a backup to the hook, and (b)
+                                    # keep the reset time fresh while waiting. Separate
+                                    # from the two surgical rechecks above. Costs a tiny
+                                    # quota per probe — `config auto_refetch false` to stop.
+    "refetch_interval_min": 60,     # cadence of that 1-hour loop
     "resume_mode": "inject",        # how to resume: inject (type into the open session)
                                     # | window (new visible claude --continue) | headless
 }

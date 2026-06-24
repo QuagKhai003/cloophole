@@ -2,9 +2,10 @@
 
 @context  The loop that enforces "never fire blind": each tick reloads state,
           checks the reset clock + live gate, and only then fires.
-@done     tick() (WATCHING poll + WAITING/ARMED transitions), _do_fire (fires in
-          every live session dir, or a pinned work_dir), detect_sessions,
-          claim_pid/release_pid/loop/run (single-instance background watcher).
+@done     tick() (hook signal -> real reset via payload/probe/estimate; WATCHING
+          poll + 1h auto-refetch; WAITING surgical rechecks + 1h refetch; ARMED),
+          _do_fire (fires every live session dir, or a pinned work_dir),
+          detect_sessions, claim_pid/release_pid/loop/run (single-instance watcher).
 @todo     non-Windows detect (P5).
 @limits   detect_sessions returns (False, []) off Windows in this build.
 @affects  Reads/writes state; calls winproc.detect_all, claude_hook.read_signal
@@ -46,6 +47,20 @@ def _due_to_poll(st: state.State, cfg: dict, now: datetime) -> bool:
     except ValueError:
         return True
     return (now - last).total_seconds() >= cfg.get("poll_interval_min", 30) * 60
+
+
+def _due_to_refetch(st: state.State, cfg: dict, now: datetime) -> bool:
+    """The separate 1-hour loop: catch the limit on our own (WATCHING) and refresh
+    the reset time (WAITING). Distinct from poll_enabled and the surgical rechecks."""
+    if not cfg.get("auto_refetch", True):
+        return False
+    if not st.last_poll:
+        return True
+    try:
+        last = datetime.fromisoformat(st.last_poll)
+    except (ValueError, TypeError):
+        return True
+    return (now - last).total_seconds() >= cfg.get("refetch_interval_min", 60) * 60
 
 
 def log(msg: str) -> None:
@@ -197,6 +212,7 @@ def tick(cfg: dict) -> state.State:
             st.limit_text = limit_text
             st.hook_dir = sig.get("cwd")
             st.phase = state.WAITING
+            st.last_poll = now.isoformat()  # start the 1h refetch clock from here
             # Re-checks: if we had to ESTIMATE, recheck soon to correct it; always
             # recheck near the reset (catches an early reset, e.g. a plan upgrade).
             before = reset - timedelta(minutes=cfg.get("recheck_before_min", 10))
@@ -210,7 +226,10 @@ def tick(cfg: dict) -> state.State:
             state.save_runtime(st)
             return st
 
-    if st.phase == state.WATCHING and _due_to_poll(st, cfg, now):
+    # WATCHING: the idle poll AND the 1h refetch loop both probe to catch the limit
+    # on our own (a backup to the hook). Either being due triggers one probe.
+    if st.phase == state.WATCHING and (_due_to_poll(st, cfg, now)
+                                       or _due_to_refetch(st, cfg, now)):
         st.last_poll = now.isoformat()
         limited, text = probe.probe(cfg)
         if limited:
@@ -224,7 +243,9 @@ def tick(cfg: dict) -> state.State:
         return st
 
     if st.phase == state.WAITING:
-        # Due re-check? Probe once to confirm the limit is real (catches an early reset).
+        from .reset_parser import parse_reset
+        # 1) Due surgical re-check? Probe once to confirm the limit (catches an early
+        #    reset). Kept first so a cleared limit can fire in this same tick.
         if st.recheck_at:
             try:
                 nxt = datetime.fromisoformat(st.recheck_at[0])
@@ -237,13 +258,13 @@ def tick(cfg: dict) -> state.State:
                     log("recheck: no longer limited -> reset reached early")
                     st.reset_at = now.isoformat()  # let the reset logic below fire
                 else:
-                    from .reset_parser import parse_reset
                     dt = parse_reset(text or "")
                     if dt:
                         st.reset_at = dt.isoformat()  # refine the estimate
                     log(f"recheck: still limited (reset ~{st.reset_at})")
                     state.save_runtime(st)
                     return st
+        # 2) Reset reached? fire / arm.
         rst = st.reset_dt()
         if rst and now >= rst:
             if live:
@@ -252,6 +273,21 @@ def tick(cfg: dict) -> state.State:
             st.phase = state.ARMED
             log("reset reached, no live session -> ARMED")
             state.save_runtime(st)   # persist the WAITING -> ARMED transition
+            return st
+        # 3) Still waiting (reset in the future): the SEPARATE 1h refetch loop keeps
+        #    the reset time fresh / catches an early reset.
+        if _due_to_refetch(st, cfg, now):
+            st.last_poll = now.isoformat()
+            limited, text = probe.probe(cfg)
+            if not limited:
+                log("refetch: no longer limited -> reset reached early")
+                st.reset_at = now.isoformat()
+            else:
+                dt = parse_reset(text or "")
+                if dt:
+                    st.reset_at = dt.isoformat()
+                log(f"refetch: still limited (reset ~{st.reset_at})")
+            state.save_runtime(st)
             return st
 
     elif st.phase == state.ARMED:
