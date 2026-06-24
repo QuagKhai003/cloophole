@@ -290,6 +290,8 @@ def cmd_open(_args: list[str]) -> int:
         elif not statusline.statusline_installed():
             print("note: you have a custom Claude statusLine — left it as-is "
                   "(live usage countdown off).")
+        if statusline.install_statusline_wsl():   # WSL Claude too (best-effort)
+            print("live usage on for WSL Claude as well.")
     except Exception:
         pass
     runner.launch_gui()
@@ -312,11 +314,19 @@ def cmd_hook(args: list[str]) -> int:
     if args and args[0] == "on":
         claude_hook.install_hook()
         statusline.install_statusline()
+        try:
+            statusline.install_statusline_wsl()
+        except Exception:
+            pass
         print(f"limit auto-detect hook installed -> {claude_hook.settings_path()}")
         print("  restart Claude Code to load it.")
     elif args and args[0] == "off":
         gone = claude_hook.uninstall_hook()
         gone = statusline.uninstall_statusline() or gone
+        try:
+            gone = statusline.uninstall_statusline_wsl() or gone
+        except Exception:
+            pass
         print("removed." if gone else "no cloophole hook/statusLine found.")
     else:
         on = claude_hook.hook_installed()
@@ -357,9 +367,14 @@ def cmd_uninstall(_args: list[str]) -> int:
     swept = runner.kill_all()  # sweep any leftover/orphan cloophole processes
     if swept:
         print(f"stopped {swept} leftover cloophole process(es).")
-    try:  # remove our statusLine reader from Claude's settings
+    try:  # remove our statusLine reader from Claude's settings (Windows + WSL)
         from . import statusline
-        if statusline.uninstall_statusline():
+        removed = statusline.uninstall_statusline()
+        try:
+            removed = statusline.uninstall_statusline_wsl() or removed
+        except Exception:
+            pass
+        if removed:
             print("removed the statusLine reader from Claude settings.")
     except Exception:
         pass
