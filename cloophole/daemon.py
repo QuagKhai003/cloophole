@@ -195,6 +195,17 @@ def tick(cfg: dict) -> state.State:
                     reset = datetime.fromisoformat(sig["reset_at"])
                 except (ValueError, TypeError):
                     reset = None
+            # 1b) the statusLine already captured the real 5h reset (zero quota)
+            if reset is None:
+                try:
+                    from . import statusline
+                    info = statusline.read_status() or {}
+                    wdt = datetime.fromisoformat(info["window_reset_at"]) \
+                        if info.get("window_reset_at") else None
+                    if wdt and wdt > now:
+                        reset = wdt
+                except Exception:
+                    pass
             # 2) else one probe NOW: you're limited, so the call is rejected and
             #    returns the limit message with the real reset (cheap, one-shot).
             if reset is None and cfg.get("probe_on_limit", True):

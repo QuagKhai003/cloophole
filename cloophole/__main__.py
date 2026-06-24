@@ -281,6 +281,17 @@ def cmd_open(_args: list[str]) -> int:
                   "`cloophole hook off` to remove)")
     except Exception:
         pass
+    # Register the statusLine reader so we learn the REAL reset time + usage % live,
+    # before any limit (zero quota). Never clobbers a user's own statusLine.
+    try:
+        from . import statusline
+        if statusline.install_statusline():
+            print("live usage on: reading Claude's statusLine (real reset time + %).")
+        elif not statusline.statusline_installed():
+            print("note: you have a custom Claude statusLine — left it as-is "
+                  "(live usage countdown off).")
+    except Exception:
+        pass
     runner.launch_gui()
     print("Opening cloophole… (the window watches for the limit; keep it open).")
     return 0
@@ -295,16 +306,22 @@ def cmd_limit_signal(_args: list[str]) -> int:
 
 
 def cmd_hook(args: list[str]) -> int:
-    """Register/remove the zero-quota rate-limit auto-detect hook."""
-    from . import claude_hook
+    """Register/remove the zero-quota auto-detect: the rate-limit hook AND the
+    statusLine reader (real reset time + usage %)."""
+    from . import claude_hook, statusline
     if args and args[0] == "on":
         claude_hook.install_hook()
+        statusline.install_statusline()
         print(f"limit auto-detect hook installed -> {claude_hook.settings_path()}")
         print("  restart Claude Code to load it.")
     elif args and args[0] == "off":
-        print("removed." if claude_hook.uninstall_hook() else "no cloophole hook found.")
+        gone = claude_hook.uninstall_hook()
+        gone = statusline.uninstall_statusline() or gone
+        print("removed." if gone else "no cloophole hook/statusLine found.")
     else:
-        print(f"limit auto-detect hook is {'ON' if claude_hook.hook_installed() else 'OFF'}")
+        on = claude_hook.hook_installed()
+        print(f"limit auto-detect hook is {'ON' if on else 'OFF'}; "
+              f"statusLine reader is {'ON' if statusline.statusline_installed() else 'OFF'}")
         print("usage: cloophole hook on|off")
     return 0
 
@@ -340,6 +357,12 @@ def cmd_uninstall(_args: list[str]) -> int:
     swept = runner.kill_all()  # sweep any leftover/orphan cloophole processes
     if swept:
         print(f"stopped {swept} leftover cloophole process(es).")
+    try:  # remove our statusLine reader from Claude's settings
+        from . import statusline
+        if statusline.uninstall_statusline():
+            print("removed the statusLine reader from Claude settings.")
+    except Exception:
+        pass
     try:  # remove our rate-limit hook from Claude's settings
         from . import claude_hook
         if claude_hook.uninstall_hook():
@@ -465,8 +488,32 @@ COMMANDS = {
 }
 
 
+def cmd_statusline(_args: list[str]) -> int:
+    """Internal: Claude's statusLine pipes its JSON here every turn. Capture the real
+    5h reset time + usage (zero quota), then print a one-line status. Kept lean — runs
+    very often, so it imports nothing heavy."""
+    from . import statusline
+    blob = ""
+    try:
+        if sys.stdin is not None and not sys.stdin.isatty():
+            blob = sys.stdin.read()
+    except Exception:
+        blob = ""
+    info = statusline.parse(blob)
+    if info:
+        try:
+            statusline.write_status(info)
+        except Exception:
+            pass
+    print(statusline.render(info or statusline.read_status()))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
+    # Fast path FIRST (statusLine runs on every turn): skip the USAGE/dispatch overhead.
+    if argv and argv[0] == "statusline":
+        return cmd_statusline(argv[1:])
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
         return 0
