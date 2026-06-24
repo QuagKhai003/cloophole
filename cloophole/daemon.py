@@ -171,19 +171,41 @@ def tick(cfg: dict) -> state.State:
     if sig:
         claude_hook.clear_signal()
         if st.phase in (state.WATCHING, state.ARMED, state.FIRED, state.ERROR):
-            hours = cfg.get("limit_window_hours", 5)
-            reset = now + timedelta(hours=hours)
+            from .reset_parser import parse_reset
+            limit_text = f"rate-limit hook @ {sig.get('ts')}"
+            reset = None
+            # 1) real reset straight from the hook payload (zero quota)
+            if sig.get("reset_at"):
+                try:
+                    reset = datetime.fromisoformat(sig["reset_at"])
+                except (ValueError, TypeError):
+                    reset = None
+            # 2) else one probe NOW: you're limited, so the call is rejected and
+            #    returns the limit message with the real reset (cheap, one-shot).
+            if reset is None and cfg.get("probe_on_limit", True):
+                limited, text = probe.probe(cfg)
+                if limited and text:
+                    dt = parse_reset(text)
+                    if dt:
+                        reset = dt
+                        limit_text = text.strip()[:200]
+            # 3) else fall back to the worst-case window estimate
+            estimated = reset is None
+            if reset is None:
+                reset = now + timedelta(hours=cfg.get("limit_window_hours", 5))
             st.reset_at = reset.isoformat()
-            st.limit_text = f"rate-limit hook @ {sig.get('ts')}"
+            st.limit_text = limit_text
             st.hook_dir = sig.get("cwd")
             st.phase = state.WAITING
-            # Surgical re-checks (a probe confirms reality, e.g. a plan upgrade that
-            # cleared the limit early): once shortly after detection, once near the
-            # estimated reset. Only future times, soonest first.
-            after = now + timedelta(minutes=cfg.get("recheck_after_min", 10))
+            # Re-checks: if we had to ESTIMATE, recheck soon to correct it; always
+            # recheck near the reset (catches an early reset, e.g. a plan upgrade).
             before = reset - timedelta(minutes=cfg.get("recheck_before_min", 10))
-            st.recheck_at = sorted(t.isoformat() for t in (after, before) if t > now)
-            log(f"rate-limit hook -> WAITING, est reset {st.reset_at}, dir={st.hook_dir}, "
+            cands = [before]
+            if estimated:
+                cands.append(now + timedelta(minutes=cfg.get("recheck_after_min", 10)))
+            st.recheck_at = sorted(t.isoformat() for t in cands if t > now)
+            log(f"rate-limit hook -> WAITING, reset {st.reset_at} "
+                f"({'estimate' if estimated else 'actual'}), dir={st.hook_dir}, "
                 f"rechecks={st.recheck_at}")
             state.save_runtime(st)
             return st

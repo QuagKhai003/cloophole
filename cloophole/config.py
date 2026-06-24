@@ -27,7 +27,11 @@ DEFAULTS: dict[str, Any] = {
     "poll_interval_min": 30,        # gentle, but probing still costs quota
     "fire_timeout_sec": 1800,       # cap a single --continue run
     "claude_process_name": "claude.exe",
-    "limit_window_hours": 5,        # est. reset window when the rate-limit hook fires
+    "limit_window_hours": 5,        # FALLBACK est. window if we can't read the real reset
+    "probe_on_limit": True,         # when the hook fires, do ONE probe to read the REAL
+                                    # reset time (you're already limited, so the call is
+                                    # rejected -> cheap, not continuous polling). Off ->
+                                    # show the worst-case +window estimate until a recheck.
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
     "resume_mode": "inject",        # how to resume: inject (type into the open session)
