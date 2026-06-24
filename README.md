@@ -6,6 +6,8 @@ You hit the limit and walk away. cloophole watches for the reset on its own, and
 the moment it clears it types your message straight into your open `claude`
 session so the work picks itself back up. No babysitting, no lost momentum.
 
+Especially useful when you only just got 20$ subscription from Anthropic
+
 - 🪟 **Just a window.** One small desktop app — it *is* the watcher. No background
   daemon, no tray, no service.
 - 🎯 **Per-session control.** Lists every live Claude session with a tick box and
