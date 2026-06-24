@@ -151,6 +151,10 @@ def run() -> None:
     v_dot.pack(side="left", padx=(0, 8))
     v_status = lbl(phase_row, "", FG, ("Segoe UI", 11, "bold"), bg=PANEL)
     v_status.pack(side="left")
+    set_link = tk.Label(phase_row, text="set reset time", fg=ACCENT, bg=PANEL,
+                        font=("Segoe UI", 8, "underline"), cursor="hand2")
+    set_link.pack(side="right")
+    set_link.bind("<Button-1>", lambda _e: set_reset_time())
     # big countdown — only shown when there's a reset to count down to.
     v_count = lbl(sc, "", ACCENT, ("Segoe UI", 24, "bold"), bg=PANEL)
     v_meta = lbl(sc, "", SUB, ("Segoe UI", 9), bg=PANEL, justify="left")
@@ -438,15 +442,43 @@ def run() -> None:
                 "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")
 
     def clear_limit():
-        # forget a detected limit and go back to watching (if the auto-detected
-        # reset was wrong or you're not actually limited)
+        # forget a detected/typed reset and go back to watching
         st = state.load()
         st.phase = state.WATCHING
         st.reset_at = None
         st.limit_text = None
         st.last_error = None
+        st.manual_reset = False
         st.recheck_at = []
         state.save_runtime(st)
+
+    def set_reset_time():
+        # Let the user type the reset time they can already see in Claude (e.g. it
+        # shows "resets 10pm") so the countdown is live BEFORE they hit the limit.
+        from tkinter import simpledialog
+
+        from .reset_parser import parse_reset
+        txt = simpledialog.askstring(
+            "Set reset time",
+            "Type the reset time you see in Claude (e.g. 10pm, 10:30 PM, in 2h):",
+            parent=root)
+        if not txt:
+            return
+        dt = parse_reset(txt)
+        if not dt:
+            messagebox.showwarning(
+                "cloophole", "Couldn't read a time from that. Try e.g. '10:30 PM' or 'in 2h'.")
+            return
+        st = state.load()
+        st.reset_at = dt.isoformat()
+        st.limit_text = "(set manually)"
+        st.manual_reset = True
+        st.recheck_at = []
+        st.phase = state.WAITING
+        state.save_runtime(st)
+        messagebox.showinfo(
+            "cloophole", f"Counting down to {dt.astimezone():%I:%M %p}. "
+            "It will resume your ticked sessions then.")
 
     mkbtn(actions, "▶  Resume now", do_resume, accent=True, grid=(0, 0), columnspan=2)
     mkbtn(actions, "Reset the detected time limit", clear_limit, grid=(1, 0))
@@ -457,7 +489,10 @@ def run() -> None:
         # Never let one bad refresh kill the loop — always reschedule in `finally`.
         try:
             st = state.load()
-            v_status.config(text=_PHASE_PLAIN.get(st.phase, st.phase))
+            status_txt = _PHASE_PLAIN.get(st.phase, st.phase)
+            if st.phase == state.WAITING and getattr(st, "manual_reset", False):
+                status_txt = "Counting down to your reset"
+            v_status.config(text=status_txt)
             v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
             if st.reset_at:
                 v_count.config(text=_countdown(st))

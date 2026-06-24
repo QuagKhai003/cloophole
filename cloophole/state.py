@@ -48,6 +48,7 @@ class State:
     last_error: Optional[str] = None
     last_poll: Optional[str] = None       # last idle probe (ISO UTC)
     hook_dir: Optional[str] = None        # cwd from the rate-limit hook (fire fallback)
+    manual_reset: bool = False            # user typed the reset time -> don't probe-override it
     recheck_at: list = field(default_factory=list)  # pending probe re-checks (ISO UTC)
     live_session: bool = False            # last observed
     live_dirs: list = field(default_factory=list)  # cwds of every live session (display)
@@ -119,7 +120,8 @@ def save(st: State) -> None:
 # made unticked sessions still fire and messages fall back).
 _USER_FIELDS = ("queue_note", "work_dir", "excluded_dirs", "note_mode", "session_notes")
 _RUNTIME_FIELDS = ("phase", "reset_at", "limit_text", "last_fired", "last_error",
-                   "last_poll", "hook_dir", "recheck_at", "live_session", "live_dirs")
+                   "last_poll", "hook_dir", "manual_reset", "recheck_at",
+                   "live_session", "live_dirs")
 
 
 def save_user(st: State) -> None:

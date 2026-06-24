@@ -246,7 +246,8 @@ def tick(cfg: dict) -> state.State:
         from .reset_parser import parse_reset
         # 1) Due surgical re-check? Probe once to confirm the limit (catches an early
         #    reset). Kept first so a cleared limit can fire in this same tick.
-        if st.recheck_at:
+        #    Skipped when the user typed the reset time (their truth, no probing).
+        if not st.manual_reset and st.recheck_at:
             try:
                 nxt = datetime.fromisoformat(st.recheck_at[0])
             except (ValueError, TypeError):
@@ -275,8 +276,8 @@ def tick(cfg: dict) -> state.State:
             state.save_runtime(st)   # persist the WAITING -> ARMED transition
             return st
         # 3) Still waiting (reset in the future): the SEPARATE 1h refetch loop keeps
-        #    the reset time fresh / catches an early reset.
-        if _due_to_refetch(st, cfg, now):
+        #    the reset time fresh / catches an early reset. Not for a manual time.
+        if not st.manual_reset and _due_to_refetch(st, cfg, now):
             st.last_poll = now.isoformat()
             limited, text = probe.probe(cfg)
             if not limited:
