@@ -107,6 +107,47 @@ def is_limit_message(text: str) -> bool:
     )
 
 
+def parse_user_time(text: str, now: Optional[datetime] = None) -> Optional[datetime]:
+    """Lenient parse for a time the USER types directly (the 'set reset time' box).
+    Unlike parse_reset (which needs limit-message wording), this accepts a bare clock
+    time ('7:30 PM', '10pm', '22:00') or a bare duration ('2 min', '90m', '1h30m',
+    'in 2h'). Returns aware UTC, or None."""
+    if not text:
+        return None
+    now = now or datetime.now(timezone.utc)
+    dt = parse_reset(text, now)          # handles 'resets at…', 'in 2h', ISO
+    if dt:
+        return dt
+    low = text.strip().lower()
+    # bare duration: number(s) + unit, no 'in' needed ('2 min', '1h30m', '90m').
+    # (?![a-z]) ends the unit so 'h3' in '1h30m' matches but 'ham' doesn't.
+    spans = re.findall(
+        r"(\d+)\s*(h(?:ours?|rs?)?|m(?:in(?:utes?)?)?|s(?:ec(?:onds?)?)?)(?![a-z])", low)
+    if spans:
+        total = timedelta()
+        for value, unit in spans:
+            n, u = int(value), unit[0]
+            total += (timedelta(hours=n) if u == "h"
+                      else timedelta(minutes=n) if u == "m" else timedelta(seconds=n))
+        if total:
+            return now + total
+    # bare clock time: '7:30 pm', '10pm', '22:00', '5'
+    cm = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$", low)
+    if cm:
+        hour, minute, ampm = int(cm.group(1)), int(cm.group(2) or 0), cm.group(3)
+        if ampm == "pm" and hour != 12:
+            hour += 12
+        elif ampm == "am" and hour == 12:
+            hour = 0
+        if hour <= 23 and minute <= 59:
+            local_now = now.astimezone()
+            cand = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if cand <= local_now:
+                cand += timedelta(days=1)
+            return _to_utc(cand)
+    return None
+
+
 def parse_reset(text: str, now: Optional[datetime] = None) -> Optional[datetime]:
     """Best-effort parse. Returns aware UTC datetime or None.
 
