@@ -274,6 +274,10 @@ def cmd_open(_args: list[str]) -> int:
     try:
         newly = not claude_hook.hook_installed()
         claude_hook.install_hook()
+        try:
+            claude_hook.install_hook_wsl()   # WSL Claude too (best-effort)
+        except Exception:
+            pass
         if newly:
             print(f"auto-detect on: registered a rate-limit hook in "
                   f"{claude_hook.settings_path()}")
@@ -315,6 +319,7 @@ def cmd_hook(args: list[str]) -> int:
         claude_hook.install_hook()
         statusline.install_statusline()
         try:
+            claude_hook.install_hook_wsl()
             statusline.install_statusline_wsl()
         except Exception:
             pass
@@ -324,6 +329,7 @@ def cmd_hook(args: list[str]) -> int:
         gone = claude_hook.uninstall_hook()
         gone = statusline.uninstall_statusline() or gone
         try:
+            gone = claude_hook.uninstall_hook_wsl() or gone
             gone = statusline.uninstall_statusline_wsl() or gone
         except Exception:
             pass
@@ -378,8 +384,12 @@ def cmd_uninstall(_args: list[str]) -> int:
             print("removed the statusLine reader from Claude settings.")
     except Exception:
         pass
-    try:  # remove our rate-limit hook from Claude's settings
+    try:  # remove our rate-limit hook from Claude's settings (Windows + WSL)
         from . import claude_hook
+        try:
+            claude_hook.uninstall_hook_wsl()
+        except Exception:
+            pass
         if claude_hook.uninstall_hook():
             print("removed the rate-limit hook from Claude settings.")
     except Exception:

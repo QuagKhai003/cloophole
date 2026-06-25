@@ -37,11 +37,26 @@ try {
             $sp = ($sp | Out-String).Trim()
             if ($sp -and (Test-Path $sp)) {
                 $j = Get-Content $sp -Raw | ConvertFrom-Json
+                $changed = $false
+                # statusLine reader
                 if ($j.statusLine -and ("$($j.statusLine.command)" -like '*statusline*')) {
-                    $j.PSObject.Properties.Remove('statusLine')
+                    $j.PSObject.Properties.Remove('statusLine'); $changed = $true
+                }
+                # StopFailure rate-limit hook (command contains 'limit-signal')
+                if ($j.hooks -and $j.hooks.StopFailure) {
+                    $kept = @($j.hooks.StopFailure | Where-Object {
+                        -not ($_.hooks | Where-Object { "$($_.command)" -like '*limit-signal*' })
+                    })
+                    if ($kept.Count -ne @($j.hooks.StopFailure).Count) {
+                        if ($kept.Count) { $j.hooks.StopFailure = $kept }
+                        else { $j.hooks.PSObject.Properties.Remove('StopFailure') }
+                        $changed = $true
+                    }
+                }
+                if ($changed) {
                     [IO.File]::WriteAllText($sp, ($j | ConvertTo-Json -Depth 30))
                     $label = if ($d) { $d } else { 'default' }
-                    Write-Host "removed WSL statusLine ($label)" -ForegroundColor Green
+                    Write-Host "removed WSL cloophole entries ($label)" -ForegroundColor Green
                 }
             }
         } catch {}

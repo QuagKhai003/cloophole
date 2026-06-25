@@ -6,8 +6,10 @@
           daemon watches. Public hooks API only — honors the Golden Rule (no
           transcript/internal reads; the hook is the user's own config).
 @done     install_hook/uninstall_hook/hook_installed (merge our entry into the
-          user's Claude settings.json), record_signal (write), read_signal/
-          clear_signal (daemon side).
+          Windows Claude settings.json) + install_hook_wsl/uninstall_hook_wsl (same
+          hook in the WSL distro's settings via \\wsl$, command runs our exe through
+          interop — so a WSL-only session signals the limit too). record_signal
+          (write), read_signal/clear_signal (daemon side).
 @todo     surface install state in the GUI; macOS/Linux paths.
 @limits   The hook reports THAT a limit hit (+ its cwd); record_signal tries to
           parse a reset time out of the payload too. If absent, the daemon probes
@@ -74,32 +76,36 @@ def hook_installed() -> bool:
     return False
 
 
-def install_hook() -> bool:
-    """Register the rate-limit hook in the user's Claude settings. Idempotent;
-    refreshes our command if already present. Returns True (installed)."""
-    p = settings_path()
-    data = _load(p)
-    hooks = data.setdefault("hooks", {})
-    lst = hooks.setdefault(HOOK_EVENT, [])
-    cmd = _cloophole_cmd()
-    for entry in lst:
-        for h in entry.get("hooks", []):
-            if _MARK in h.get("command", ""):
-                h["command"] = cmd  # refresh exe path
-                _save(p, data)
-                return True
-    lst.append({"matcher": HOOK_MATCHER,
-                "hooks": [{"type": "command", "command": cmd}]})
-    _save(p, data)
-    return True
+def _install_at(p, cmd: str) -> bool:
+    """Merge our StopFailure/rate_limit hook (running `cmd`) into the settings at `p`.
+    Idempotent; refreshes our command if present; keeps the user's other hooks."""
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        data = _load(p)
+        hooks = data.setdefault("hooks", {})
+        lst = hooks.setdefault(HOOK_EVENT, [])
+        for entry in lst:
+            for h in entry.get("hooks", []):
+                if _MARK in h.get("command", ""):
+                    h["command"] = cmd
+                    _save(p, data)
+                    return True
+        lst.append({"matcher": HOOK_MATCHER,
+                    "hooks": [{"type": "command", "command": cmd}]})
+        _save(p, data)
+        return True
+    except OSError:
+        return False
 
 
-def uninstall_hook() -> bool:
-    """Remove only our hook entry; prune empty structures. True if removed."""
-    p = settings_path()
+def _uninstall_at(p) -> bool:
+    """Remove only our hook entry from the settings at `p`; prune empties."""
     if not p.exists():
         return False
-    data = _load(p)
+    try:
+        data = _load(p)
+    except OSError:
+        return False
     hooks = data.get("hooks", {})
     lst = hooks.get(HOOK_EVENT, [])
     removed = False
@@ -119,8 +125,47 @@ def uninstall_hook() -> bool:
             hooks.pop(HOOK_EVENT, None)
         if not hooks:
             data.pop("hooks", None)
-        _save(p, data)
+        try:
+            _save(p, data)
+        except OSError:
+            return False
     return removed
+
+
+def install_hook() -> bool:
+    """Register the rate-limit hook in the Windows Claude settings."""
+    return _install_at(settings_path(), _cloophole_cmd())
+
+
+def uninstall_hook() -> bool:
+    return _uninstall_at(settings_path())
+
+
+# ---- WSL Claude: its settings live inside the distro and it can't run a Windows exe
+# path, so a WSL-only session never signalled the limit. Install the SAME hook into the
+# distro's ~/.claude (via the \\wsl$ path), running our exe through WSL interop. ----
+
+def _wsl_cmd() -> Optional[str]:
+    if not getattr(sys, "frozen", False):
+        return None
+    from . import wsl
+    u = wsl.exe_unix_path(sys.executable)
+    return f"'{u}' limit-signal" if u else None
+
+
+def install_hook_wsl() -> bool:
+    cmd = _wsl_cmd()
+    if not cmd:
+        return False
+    from . import wsl
+    sp = wsl.claude_settings_winpath()
+    return _install_at(Path(sp), cmd) if sp else False
+
+
+def uninstall_hook_wsl() -> bool:
+    from . import wsl
+    sp = wsl.claude_settings_winpath()
+    return _uninstall_at(Path(sp)) if sp else False
 
 
 # --- daemon side: the signal file -------------------------------------------
