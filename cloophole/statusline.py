@@ -7,7 +7,9 @@ zero quota, BEFORE any limit is hit (ADR-0014).
           status.json (the window reads it for a live countdown + % long before a limit)
           and prints a small status line. Public statusLine API — Claude hands us the
           data, we read no transcript/internal files (Golden Rule, like the hook).
-@done     parse/write/read/render (UNBRANDED — shows in every project's status bar);
+@done     parse + update_status (MERGE across terminals: keep the freshest account usage
+          so an idle/older terminal can't pull the numbers backward) / read / render
+          (UNBRANDED — shows in every project's status bar);
           install/uninstall for BOTH the Windows ~/.claude AND the default WSL distro's
           ~/.claude (via the \\wsl$ path, command runs our exe through WSL interop), so a
           WSL-only setup still gets the reset time. Never clobbers a user's statusLine.
@@ -63,11 +65,61 @@ def parse(blob: Optional[str]) -> Optional[dict]:
 
 
 def write_status(info: dict) -> None:
+    import os
     info = dict(info)
     info["ts"] = datetime.now(timezone.utc).isoformat()
     p = status_file()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(info), encoding="utf-8")
+    tmp = p.with_name(p.name + f".{os.getpid()}.tmp")  # atomic + concurrency-safe
+    tmp.write_text(json.dumps(info), encoding="utf-8")
+    try:
+        os.replace(tmp, p)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
+def _dt(iso: Optional[str]) -> Optional[datetime]:
+    if not iso:
+        return None
+    try:
+        return datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return None
+
+
+def update_status(info: dict) -> None:
+    """Merge a statusLine sample into status.json, keeping the FRESHEST account usage
+    across all open terminals. Many terminals write the same file; an idle/older one
+    must not pull the numbers backward:
+      - drop a sample whose 5h window already passed (stale) when we hold a live one;
+      - an OLDER window than the one we hold is ignored; a NEWER window is adopted;
+      - within the SAME window, keep the HIGHER used% (usage only rises until reset)."""
+    now = datetime.now(timezone.utc)
+    cur = read_status() or {}
+    nr, cr = _dt(info.get("window_reset_at")), _dt(cur.get("window_reset_at"))
+    cur_live = cr is not None and cr > now
+
+    if nr is None:                       # sample carries no reset of its own
+        if cur_live and info.get("used_pct", -1) > cur.get("used_pct", -1):
+            cur["used_pct"] = info["used_pct"]
+            if "used_pct_7d" in info:
+                cur["used_pct_7d"] = info["used_pct_7d"]
+            write_status(cur)
+        elif not cur:
+            write_status(info)
+        return
+
+    if nr <= now and cur_live:           # this sample's window already reset -> stale
+        return
+    if cur_live:
+        if nr < cr:                      # older window than ours -> ignore
+            return
+        if nr == cr and info.get("used_pct", -1) <= cur.get("used_pct", -1):
+            return                       # same window, not fresher -> keep ours
+    write_status(info)                   # newer window, or no live record -> take it
 
 
 def read_status() -> Optional[dict]:
