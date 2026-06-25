@@ -57,6 +57,19 @@ def bash(script: str, timeout: int = 15) -> Optional[str]:
     return p.stdout if (p and p.returncode == 0) else None
 
 
+def claude_settings_winpath() -> Optional[str]:
+    """Windows path to the default WSL distro's ~/.claude/settings.json (or None).
+    Reachable from Windows over \\\\wsl$, so we can read/write it directly."""
+    out = bash('wslpath -w "$HOME/.claude/settings.json" 2>/dev/null')
+    return out.strip() if out and out.strip() else None
+
+
+def exe_unix_path(win_exe: str) -> Optional[str]:
+    """The /mnt/... path WSL uses to run our Windows exe (via interop), or None."""
+    out = bash(f'wslpath -u "{win_exe}" 2>/dev/null')
+    return out.strip() if out and out.strip() else None
+
+
 def claude_sessions() -> List[Tuple[str, str, str]]:
     """[(pane_id, cwd, where)] for every tmux pane running claude. `where` is a
     human marker like 'w0.p2' (window.pane index) you can match with `prefix + q`."""
