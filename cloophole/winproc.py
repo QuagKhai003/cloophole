@@ -96,6 +96,25 @@ def find_pids(process_name: str) -> list[int]:
     return pids
 
 
+def session_root_pids(process_name: str) -> list[int]:
+    """ONE pid per Claude session. `claude` launches a parent claude.exe that spawns a
+    child claude.exe, so a session shows as two processes; keep only the ROOT (whose
+    parent is NOT claude.exe). Injecting into the root reaches the child via their
+    shared console. Falls back to all matches if the parent map is unavailable."""
+    named = all_procs_named()
+    if not named:
+        return find_pids(process_name)
+    target = process_name.lower()
+    claude = [pid for pid, (_ppid, nm) in named.items() if (nm or "").lower() == target]
+    roots = []
+    for pid in claude:
+        ppid = named[pid][0]
+        parent = named.get(ppid)
+        if not parent or (parent[1] or "").lower() != target:  # parent isn't claude
+            roots.append(pid)
+    return roots
+
+
 def list_procs(process_name: str) -> list[tuple[int, int]]:
     """[(pid, parent_pid)] for processes whose exe matches process_name.
 
@@ -220,9 +239,8 @@ def all_procs() -> dict[int, int]:
 
 
 def session_pids(process_name: str) -> list[tuple[int, Optional[str]]]:
-    """[(pid, cwd)] for each live session — so the caller can target the right
-    process (e.g. inject the resume into the session whose folder was ticked)."""
-    return [(pid, process_cwd(pid)) for pid in find_pids(process_name)]
+    """[(pid, cwd)] for each live session (one ROOT pid per session, no child dup)."""
+    return [(pid, process_cwd(pid)) for pid in session_root_pids(process_name)]
 
 
 # Friendly names for the terminals/shells a claude session may run under. Used to
@@ -288,10 +306,10 @@ def host_terminal(pid: int, named: Optional[dict] = None) -> Optional[str]:
 
 
 def sessions_detail(process_name: str) -> list[tuple[int, Optional[str], Optional[str]]]:
-    """[(pid, cwd, terminal_label)] for each live session."""
+    """[(pid, cwd, terminal_label)] for each live session (one ROOT pid per session)."""
     named = all_procs_named()
     return [(pid, process_cwd(pid), host_terminal(pid, named))
-            for pid in find_pids(process_name)]
+            for pid in session_root_pids(process_name)]
 
 
 def detect_all(process_name: str) -> tuple[bool, list[str]]:
