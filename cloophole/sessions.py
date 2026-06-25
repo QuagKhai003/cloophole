@@ -56,14 +56,19 @@ def _detect(cfg: dict) -> List[dict]:
         return out
     from . import winproc, wsl
 
+    # Key Windows sessions by their FOLDER (stable), not pid — so a typed per-session
+    # message + tick survive a claude restart (pid changes, cwd doesn't). One row per
+    # folder; firing injects every live claude in that folder.
+    seen_cwd: set = set()
     for pid, cwd, term in winproc.sessions_detail(cfg["claude_process_name"]):
-        if not cwd:
+        if not cwd or cwd in seen_cwd:
             continue
+        seen_cwd.add(cwd)
         out.append({
-            "key": f"win:{pid}",              # pid -> unique even if 2 share a folder
+            "key": cwd,
             "folder": Path(cwd).name or cwd,
             "path": cwd,
-            "label": f"{term or 'cmd'} · pid {pid}",
+            "label": term or "cmd",
             "kind": "win",
             "handle": pid,
         })
