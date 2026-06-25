@@ -26,6 +26,8 @@ DEFAULTS: dict[str, Any] = {
                                     # the zero-cost StopFailure hook. See docs/BUGS B9.
     "poll_interval_min": 30,        # gentle, but probing still costs quota
     "fire_timeout_sec": 1800,       # cap a single --continue run
+    "probe_timeout_sec": 60,        # cap a probe (`claude -p`) so it can NEVER block the
+                                    # watch thread for long (a probe should return fast)
     "claude_process_name": "claude.exe",
     "limit_window_hours": 5,        # FALLBACK est. window if we can't read the real reset
     "probe_on_limit": True,         # when the hook fires, do ONE probe to read the REAL
@@ -34,12 +36,13 @@ DEFAULTS: dict[str, Any] = {
                                     # show the worst-case +window estimate until a recheck.
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
-    "auto_refetch": True,           # 1-hour loop: probe periodically to (a) catch the
-                                    # limit on our own as a backup to the hook, and (b)
-                                    # keep the reset time fresh while waiting. Separate
-                                    # from the two surgical rechecks above. Costs a tiny
-                                    # quota per probe — `config auto_refetch false` to stop.
-    "refetch_interval_min": 60,     # cadence of that 1-hour loop
+    "auto_refetch": False,          # OFF by default: the statusLine now feeds the real
+                                    # reset time continuously (zero quota, no blocking), so
+                                    # the old probe-based 1h loop is redundant AND its
+                                    # `claude -p` call ran in the watch thread (could stall
+                                    # it). Opt in with `config auto_refetch true` if you
+                                    # have no statusLine and want a probe backup.
+    "refetch_interval_min": 60,     # cadence of that 1-hour loop (when enabled)
     "resume_mode": "inject",        # how to resume: inject (type into the open session)
                                     # | window (new visible claude --continue) | headless
 }

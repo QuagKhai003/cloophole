@@ -41,7 +41,9 @@ def probe(cfg: Optional[dict] = None) -> tuple[bool, Optional[str]]:
             cmd,
             capture_output=True,
             text=True,
-            timeout=cfg.get("fire_timeout_sec", 1800),
+            # A probe must return fast; a short cap so it can never block the watch
+            # thread (a hung `claude -p` would otherwise freeze all auto features).
+            timeout=cfg.get("probe_timeout_sec", 60),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False, None

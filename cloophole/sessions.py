@@ -15,12 +15,42 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from pathlib import Path, PurePosixPath
 from typing import List
 
+# Both the GUI's detect thread (~1.5s) and the watch thread (~5s) call list_all, and
+# WSL detection spawns wsl.exe a few times per call — too heavy to run every time. Cache
+# the result briefly so we hit WSL at most once per _TTL across both threads.
+_TTL = 3.0
+_lock = threading.Lock()
+_cache: dict = {"t": None, "v": [], "refreshing": False}
+
 
 def list_all(cfg: dict) -> List[dict]:
-    """Every detectable Claude session, Windows + WSL. Newest detection each call."""
+    """Every detectable Claude session, Windows + WSL — cached ~_TTL seconds. A caller
+    NEVER blocks on the (possibly slow) WSL detection: while one thread refreshes, the
+    others get the last result. Keeps the watch thread responsive."""
+    with _lock:
+        fresh = _cache["t"] is not None and (time.monotonic() - _cache["t"]) < _TTL
+        if fresh or _cache["refreshing"]:
+            return list(_cache["v"])
+        _cache["refreshing"] = True
+    out = None
+    try:
+        out = _detect(cfg)
+    except Exception:
+        out = None
+    with _lock:
+        if out is not None:
+            _cache["v"] = out
+        _cache["t"] = time.monotonic()
+        _cache["refreshing"] = False
+        return list(_cache["v"])
+
+
+def _detect(cfg: dict) -> List[dict]:
     out: List[dict] = []
     if sys.platform != "win32":
         return out
