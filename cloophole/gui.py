@@ -470,17 +470,18 @@ def run() -> None:
         # shows "resets 10pm") so the countdown is live BEFORE they hit the limit.
         from tkinter import simpledialog
 
-        from .reset_parser import parse_reset
+        from .reset_parser import parse_user_time
         txt = simpledialog.askstring(
             "Set reset time",
-            "Type the reset time you see in Claude (e.g. 10pm, 10:30 PM, in 2h):",
+            "Reset time (e.g. 7:30 PM, 10pm, 22:00) or a countdown (e.g. 2 min, 1h30m):",
             parent=root)
         if not txt:
             return
-        dt = parse_reset(txt)
+        dt = parse_user_time(txt)
         if not dt:
             messagebox.showwarning(
-                "cloophole", "Couldn't read a time from that. Try e.g. '10:30 PM' or 'in 2h'.")
+                "cloophole", "Couldn't read a time from that. Try '7:30 PM', '10pm', "
+                "'22:00', or '2 min' / '1h30m'.")
             return
         st = state.load()
         st.reset_at = dt.isoformat()
