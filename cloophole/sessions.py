@@ -20,45 +20,27 @@ import time
 from pathlib import Path, PurePosixPath
 from typing import List
 
-# Both the GUI's detect thread (~1.5s) and the watch thread (~5s) call list_all, and
-# WSL detection spawns wsl.exe a few times per call — too heavy to run every time. Cache
-# the result briefly so we hit WSL at most once per _TTL across both threads.
+# Windows detection (winproc) is fast — run it FRESH every call so adds/removes show
+# immediately. WSL detection spawns wsl.exe a few times (slow) — cache that part ~_TTL
+# so we never block the watch thread or hammer wsl.exe.
 _TTL = 3.0
 _lock = threading.Lock()
 _cache: dict = {"t": None, "v": [], "refreshing": False}
 
 
 def list_all(cfg: dict) -> List[dict]:
-    """Every detectable Claude session, Windows + WSL — cached ~_TTL seconds. A caller
-    NEVER blocks on the (possibly slow) WSL detection: while one thread refreshes, the
-    others get the last result. Keeps the watch thread responsive."""
-    with _lock:
-        fresh = _cache["t"] is not None and (time.monotonic() - _cache["t"]) < _TTL
-        if fresh or _cache["refreshing"]:
-            return list(_cache["v"])
-        _cache["refreshing"] = True
-    out = None
-    try:
-        out = _detect(cfg)
-    except Exception:
-        out = None
-    with _lock:
-        if out is not None:
-            _cache["v"] = out
-        _cache["t"] = time.monotonic()
-        _cache["refreshing"] = False
-        return list(_cache["v"])
-
-
-def _detect(cfg: dict) -> List[dict]:
-    out: List[dict] = []
+    """Every detectable Claude session: Windows fresh + WSL cached. A caller never blocks
+    on the slow WSL detection (while one thread refreshes it, others get the last result)."""
     if sys.platform != "win32":
-        return out
-    from . import winproc, wsl
+        return []
+    return _detect_windows(cfg) + _wsl_cached(cfg)
 
+
+def _detect_windows(cfg: dict) -> List[dict]:
+    from . import winproc
+    out: List[dict] = []
     # Key Windows sessions by pid so multiple claude in ONE folder are controlled
-    # separately. A reopened/re-run claude is a new pid -> a fresh row (its message is
-    # not carried over, by design).
+    # separately. A reopened/re-run claude is a new pid -> a fresh row (not carried over).
     for pid, cwd, term in winproc.sessions_detail(cfg["claude_process_name"]):
         if not cwd:
             continue
@@ -70,7 +52,31 @@ def _detect(cfg: dict) -> List[dict]:
             "kind": "win",
             "handle": pid,
         })
+    return out
 
+
+def _wsl_cached(cfg: dict) -> List[dict]:
+    with _lock:
+        fresh = _cache["t"] is not None and (time.monotonic() - _cache["t"]) < _TTL
+        if fresh or _cache["refreshing"]:
+            return list(_cache["v"])
+        _cache["refreshing"] = True
+    out = None
+    try:
+        out = _detect_wsl(cfg)
+    except Exception:
+        out = None
+    with _lock:
+        if out is not None:
+            _cache["v"] = out
+        _cache["t"] = time.monotonic()
+        _cache["refreshing"] = False
+        return list(_cache["v"])
+
+
+def _detect_wsl(cfg: dict) -> List[dict]:
+    from . import wsl
+    out: List[dict] = []
     try:
         for pane, path, where in wsl.claude_sessions():
             folder = PurePosixPath(path).name or path
