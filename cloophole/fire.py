@@ -71,14 +71,14 @@ def fire_inject(work_dir: Optional[str], queue_note: Optional[str],
         return "typing into a session is Windows-only"
     from . import inject, winproc
     text = (queue_note or "").strip() or FALLBACK_NOTE
-    target = None
-    for pid, cwd in winproc.session_pids(cfg["claude_process_name"]):
-        if cwd and work_dir and _samepath(cwd, work_dir):
-            target = pid
-            break
-    if target is None:
+    # Inject into EVERY live claude in this folder (cwd is the stable key now; there can
+    # be more than one claude in a folder).
+    targets = [pid for pid, cwd in winproc.session_pids(cfg["claude_process_name"])
+               if cwd and work_dir and _samepath(cwd, work_dir)]
+    if not targets:
         return f"no live Claude session in {work_dir}"
-    return None if inject.send_text(target, text) else "couldn't type into the session"
+    results = [inject.send_text(pid, text) for pid in targets]  # send to ALL, no short-circuit
+    return None if any(results) else "couldn't type into the session"
 
 
 def resume(target: Optional[str], queue_note: Optional[str],
