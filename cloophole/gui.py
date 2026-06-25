@@ -306,13 +306,17 @@ def run() -> None:
     # being seen, so one flaky detection can't blink it in and out.
     _rendered = {"keys": None}
     _seen: dict[str, tuple] = {}   # key -> (monotonic_time, session dict)
-    _STICKY_SEC = 6.0
+
+    def _sticky_for(key: str) -> float:
+        # Windows detection is reliable -> drop fast; WSL detection can flake -> hold
+        # longer so it doesn't blink in and out.
+        return 1.5 if key.startswith("win:") else 6.0
 
     def _effective_sessions() -> list:
         now = _time.monotonic()
         for s in _detected["sessions"] or []:
             _seen[s["key"]] = (now, s)
-        for k in [k for k, (t, _s) in _seen.items() if now - t > _STICKY_SEC]:
+        for k in [k for k, (t, _s) in _seen.items() if now - t > _sticky_for(k)]:
             del _seen[k]
         return [s for _t, s in sorted(_seen.values(), key=lambda ts: ts[1]["key"])]
 
