@@ -517,7 +517,7 @@ def cmd_statusline(_args: list[str]) -> int:
     info = statusline.parse(blob)
     if info:
         try:
-            statusline.write_status(info)
+            statusline.update_status(info)   # merge: keep the freshest across terminals
         except Exception:
             pass
     folder = statusline.folder_of(blob)
