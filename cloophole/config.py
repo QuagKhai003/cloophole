@@ -36,13 +36,13 @@ DEFAULTS: dict[str, Any] = {
                                     # show the worst-case +window estimate until a recheck.
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
-    "auto_refetch": False,          # OFF by default: the statusLine now feeds the real
-                                    # reset time continuously (zero quota, no blocking), so
-                                    # the old probe-based 1h loop is redundant AND its
-                                    # `claude -p` call ran in the watch thread (could stall
-                                    # it). Opt in with `config auto_refetch true` if you
-                                    # have no statusLine and want a probe backup.
-    "refetch_interval_min": 60,     # cadence of that 1-hour loop (when enabled)
+    "auto_refetch": True,           # 1-hour loop: probe periodically to catch the limit
+                                    # on our own (backup to the hook + statusLine) and keep
+                                    # the reset fresh. The probe is now capped by
+                                    # probe_timeout_sec (60s) so it can't stall the watch
+                                    # thread like the old 1800s timeout did, and it fires
+                                    # only ~once/hour. `config auto_refetch false` to stop.
+    "refetch_interval_min": 60,     # cadence of that 1-hour loop
     "resume_mode": "inject",        # how to resume: inject (type into the open session)
                                     # | window (new visible claude --continue) | headless
 }
