@@ -132,9 +132,8 @@ def read_status() -> Optional[dict]:
         return None
 
 
-def folder_of(blob: Optional[str]) -> Optional[str]:
-    """This session's folder name from the statusLine JSON (workspace.current_dir or
-    cwd) — so each terminal's status bar shows its own project."""
+def cwd_of(blob: Optional[str]) -> Optional[str]:
+    """This session's cwd from the statusLine JSON (workspace.current_dir or cwd)."""
     if not blob:
         return None
     try:
@@ -142,17 +141,60 @@ def folder_of(blob: Optional[str]) -> Optional[str]:
     except (json.JSONDecodeError, ValueError, TypeError):
         return None
     ws = (data or {}).get("workspace") or {}
-    cwd = ws.get("current_dir") or data.get("cwd")
+    return ws.get("current_dir") or data.get("cwd")
+
+
+def folder_of(blob: Optional[str]) -> Optional[str]:
+    """The session's folder NAME — so each terminal's status bar shows its own project."""
+    cwd = cwd_of(blob)
     if not cwd:
         return None
     import os
     return os.path.basename(str(cwd).rstrip("/\\")) or str(cwd)
 
 
-def render(info: Optional[dict], folder: Optional[str] = None) -> str:
-    """The one-line status Claude shows. UNBRANDED — it appears in every project's
-    status bar, so it reads as '<folder> · usage', not an app name. Blank when there's
-    neither a folder nor usage data."""
+def _win_path(cwd: Optional[str]) -> Optional[str]:
+    """A Windows path git can read: pass through 'C:\\…', convert '/mnt/c/…' -> 'C:\\…',
+    None for a pure-Linux path (Windows git can't reach it)."""
+    if not cwd:
+        return None
+    import re
+    if re.match(r"^[a-zA-Z]:[\\/]", cwd):
+        return cwd
+    m = re.match(r"^/mnt/([a-zA-Z])/(.*)$", cwd)
+    if m:
+        return f"{m.group(1).upper()}:\\" + m.group(2).replace("/", "\\")
+    return None
+
+
+def git_info(cwd: Optional[str]) -> Optional[str]:
+    """'<branch>' or '<branch>*' (dirty working tree) for the repo at cwd, or None if
+    not a git repo / git missing. Short timeouts — runs on every status render."""
+    wp = _win_path(cwd)
+    if not wp:
+        return None
+    from . import subproc
+    try:
+        b = subproc.run(["git", "-C", wp, "rev-parse", "--abbrev-ref", "HEAD"],
+                        capture_output=True, text=True, timeout=3)
+        if b.returncode != 0 or not (b.stdout or "").strip():
+            return None
+        branch = b.stdout.strip()
+        s = subproc.run(["git", "-C", wp, "status", "--porcelain"],
+                        capture_output=True, text=True, timeout=3)
+        dirty = bool((s.stdout or "").strip()) if s.returncode == 0 else False
+        return branch + ("*" if dirty else "")
+    except Exception:
+        return None
+
+
+def render(info: Optional[dict], folder: Optional[str] = None,
+           git: Optional[str] = None) -> str:
+    """The one-line status Claude shows: '<folder> (<branch>*) · 5h N% · resets H:MM'.
+    UNBRANDED. Any part is omitted when absent."""
+    head = folder or ""
+    if git:
+        head = f"{head} ({git})" if head else f"({git})"
     parts = []
     if info:
         if "used_pct" in info:
@@ -165,9 +207,9 @@ def render(info: Optional[dict], folder: Optional[str] = None) -> str:
             except ValueError:
                 pass
     usage = " · ".join(parts)
-    if folder and usage:
-        return f"{folder} · {usage}"
-    return folder or usage
+    if head and usage:
+        return f"{head} · {usage}"
+    return head or usage
 
 
 # ---- settings.json registration (shares claude_hook.settings_path) ----------
