@@ -531,10 +531,11 @@ def cmd_statusline(_args: list[str]) -> int:
         except Exception:
             pass
     # Display the SHARED merged usage (not this terminal's own snapshot) + this
-    # session's folder & git branch/tree.
+    # session's folder & git branch/tree, in yellow (like Claude's default status line).
     folder = statusline.folder_of(blob)
     git = statusline.git_info(statusline.cwd_of(blob))
-    print(statusline.render(statusline.read_status(), folder, git))
+    line = statusline.render(statusline.read_status(), folder, git)
+    print(f"\033[33m{line}\033[0m" if line else "")
     return 0
 
 
