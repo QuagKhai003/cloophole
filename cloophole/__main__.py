@@ -530,10 +530,11 @@ def cmd_statusline(_args: list[str]) -> int:
             statusline.update_status(info)   # merge: keep the freshest across terminals
         except Exception:
             pass
-    # Display the SHARED merged value (not this terminal's own snapshot), so every
-    # terminal shows the real account usage regardless of which one is active.
+    # Display the SHARED merged usage (not this terminal's own snapshot) + this
+    # session's folder & git branch/tree.
     folder = statusline.folder_of(blob)
-    print(statusline.render(statusline.read_status(), folder))
+    git = statusline.git_info(statusline.cwd_of(blob))
+    print(statusline.render(statusline.read_status(), folder, git))
     return 0
 
 
