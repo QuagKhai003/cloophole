@@ -108,6 +108,16 @@ def resume(target: Optional[str], queue_note: Optional[str],
         except ValueError:
             return "bad target"
         return None if inject.send_text(pid, text) else "couldn't type into the session"
+    if target and str(target).startswith("desktop:"):  # Claude Desktop — the OPEN chat
+        from . import inject
+        text = (queue_note or "").strip() or FALLBACK_NOTE
+        try:
+            pid = int(str(target)[8:])
+        except ValueError:
+            return "bad target"
+        # No console (it's a GUI): send_text falls through to focus + paste + Enter,
+        # which lands in whatever conversation is currently open.
+        return None if inject.send_text(pid, text) else "couldn't type into Claude Desktop"
     mode = cfg.get("resume_mode", "inject")
     if mode == "inject":
         return fire_inject(target, queue_note, cfg)

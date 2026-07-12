@@ -41,10 +41,25 @@ def _detect_windows(cfg: dict) -> List[dict]:
     out: List[dict] = []
     # Key Windows sessions by pid so multiple claude in ONE folder are controlled
     # separately. A reopened/re-run claude is a new pid -> a fresh row (not carried over).
+    from . import inject
     for pid, cwd, term in winproc.sessions_detail(cfg["claude_process_name"]):
-        # A CLI session ALWAYS runs under a terminal (cmd / Windows Terminal / VS Code…).
-        # The Claude DESKTOP app is also claude.exe but has no terminal ancestor — skip it.
-        if not cwd or not term:
+        if not term:
+            # No terminal ancestor: either the Claude DESKTOP app (owns a window) or a
+            # headless claude.exe we spawned (no window — never a session).
+            try:
+                if inject.owns_window(pid):
+                    out.append({
+                        "key": f"desktop:{pid}",
+                        "folder": "Claude Desktop",
+                        "path": "types into whichever chat is open",
+                        "label": f"desktop app · pid {pid}",
+                        "kind": "desktop",
+                        "handle": pid,
+                    })
+            except Exception:
+                pass
+            continue
+        if not cwd:
             continue
         out.append({
             "key": f"win:{pid}",
