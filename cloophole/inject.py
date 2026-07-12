@@ -221,6 +221,30 @@ def _terminal_hwnd(pid: int) -> int | None:
 SW_RESTORE = 9
 
 
+def owns_window(pid: int) -> bool:
+    """True if `pid` ITSELF owns a visible, titled window. Distinguishes the Claude
+    DESKTOP app (a GUI) from a headless claude.exe (a probe/fire) — both lack a
+    terminal ancestor. Note: unlike _terminal_hwnd this does NOT walk ancestors."""
+    if _u32 is None:
+        return False
+    found: list[int] = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _cb(hwnd, _lp):
+        if _u32.IsWindowVisible(hwnd):
+            wpid = wintypes.DWORD()
+            _u32.GetWindowThreadProcessId(hwnd, ctypes.byref(wpid))
+            if wpid.value == pid and _u32.GetWindowTextLengthW(hwnd) > 0:
+                found.append(hwnd)
+        return True
+
+    try:
+        _u32.EnumWindows(_cb, 0)
+    except Exception:
+        return False
+    return bool(found)
+
+
 def focus(pid: int) -> bool:
     """Bring the terminal window hosting `pid` to the foreground (un-minimize +
     raise). True if a window was found and raised. Windows-only, best-effort.
