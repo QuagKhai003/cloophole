@@ -453,7 +453,14 @@ def run() -> None:
             else:
                 done += 1
         if done:
-            messagebox.showinfo("cloophole", f"Resumed {done} session(s).")
+            # One-shot message: erase it so the next limit needs a freshly typed one.
+            state.clear_notes()
+            note_var.set("")
+            _render_sessions(force=True)
+            messagebox.showinfo(
+                "cloophole",
+                f"Resumed {done} session(s).\nMessages cleared — type a new one "
+                "for the next limit.")
         else:
             messagebox.showwarning(
                 "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")

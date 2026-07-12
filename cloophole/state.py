@@ -138,3 +138,12 @@ def save_runtime(st: State) -> None:
     for f in _USER_FIELDS:
         setattr(st, f, getattr(cur, f))
     save(st)
+
+
+def clear_notes() -> None:
+    """Erase the queued message + every per-session message. Called after a fire: the
+    message is ONE-SHOT, so the next limit needs a freshly typed one."""
+    cur = load()
+    cur.queue_note = None
+    cur.session_notes = {}
+    save_user(cur)
