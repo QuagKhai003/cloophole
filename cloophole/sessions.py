@@ -42,13 +42,15 @@ def _detect_windows(cfg: dict) -> List[dict]:
     # Key Windows sessions by pid so multiple claude in ONE folder are controlled
     # separately. A reopened/re-run claude is a new pid -> a fresh row (not carried over).
     for pid, cwd, term in winproc.sessions_detail(cfg["claude_process_name"]):
-        if not cwd:
+        # A CLI session ALWAYS runs under a terminal (cmd / Windows Terminal / VS Code…).
+        # The Claude DESKTOP app is also claude.exe but has no terminal ancestor — skip it.
+        if not cwd or not term:
             continue
         out.append({
             "key": f"win:{pid}",
             "folder": Path(cwd).name or cwd,
             "path": cwd,
-            "label": f"{term or 'cmd'} · pid {pid}",
+            "label": f"{term} · pid {pid}",
             "kind": "win",
             "handle": pid,
         })

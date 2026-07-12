@@ -162,7 +162,10 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.reset_at = None
         st.limit_text = None
         st.hook_dir = None
+        st.manual_reset = False
         st.recheck_at = []
+        state.clear_notes()   # one-shot: retype a message for the next limit
+        log("messages cleared (one-shot) — type a new one for the next limit")
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
