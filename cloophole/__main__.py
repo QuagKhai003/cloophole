@@ -271,13 +271,12 @@ def cmd_open(_args: list[str]) -> int:
     runner.stop()       # stop any legacy daemon from an older build
     runner.kill_all()   # drop orphan/duplicate cloophole processes
     # Zero-quota auto-detect: register the rate-limit hook in Claude's settings.
+    # Windows-side registration is fast — do it inline. The WSL-side equivalents each
+    # spawn wsl.exe (starting the distro if cold), which used to delay the window by
+    # seconds; the GUI now does those in the background once it's up.
     try:
         newly = not claude_hook.hook_installed()
         claude_hook.install_hook()
-        try:
-            claude_hook.install_hook_wsl()   # WSL Claude too (best-effort)
-        except Exception:
-            pass
         if newly:
             print(f"auto-detect on: registered a rate-limit hook in "
                   f"{claude_hook.settings_path()}")
@@ -285,8 +284,6 @@ def cmd_open(_args: list[str]) -> int:
                   "`cloophole hook off` to remove)")
     except Exception:
         pass
-    # Register the statusLine reader so we learn the REAL reset time + usage % live,
-    # before any limit (zero quota). Never clobbers a user's own statusLine.
     try:
         from . import statusline
         if statusline.install_statusline():
@@ -294,8 +291,6 @@ def cmd_open(_args: list[str]) -> int:
         elif not statusline.statusline_installed():
             print("note: you have a custom Claude statusLine — left it as-is "
                   "(live usage countdown off).")
-        if statusline.install_statusline_wsl():   # WSL Claude too (best-effort)
-            print("live usage on for WSL Claude as well.")
     except Exception:
         pass
     runner.launch_gui()

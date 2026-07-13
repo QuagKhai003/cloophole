@@ -57,17 +57,31 @@ def bash(script: str, timeout: int = 15) -> Optional[str]:
     return p.stdout if (p and p.returncode == 0) else None
 
 
+# Each wsl.exe round-trip is slow (it starts the distro if cold). These paths don't
+# change while we run, so resolve them once per process.
+_path_cache: dict = {}
+
+
 def claude_settings_winpath() -> Optional[str]:
     """Windows path to the default WSL distro's ~/.claude/settings.json (or None).
-    Reachable from Windows over \\\\wsl$, so we can read/write it directly."""
+    Reachable from Windows over \\\\wsl$, so we can read/write it directly. Cached."""
+    if "settings" in _path_cache:
+        return _path_cache["settings"]
     out = bash('wslpath -w "$HOME/.claude/settings.json" 2>/dev/null')
-    return out.strip() if out and out.strip() else None
+    val = out.strip() if out and out.strip() else None
+    _path_cache["settings"] = val
+    return val
 
 
 def exe_unix_path(win_exe: str) -> Optional[str]:
-    """The /mnt/... path WSL uses to run our Windows exe (via interop), or None."""
+    """The /mnt/... path WSL uses to run our Windows exe (via interop), or None. Cached."""
+    key = f"exe:{win_exe}"
+    if key in _path_cache:
+        return _path_cache[key]
     out = bash(f'wslpath -u "{win_exe}" 2>/dev/null')
-    return out.strip() if out and out.strip() else None
+    val = out.strip() if out and out.strip() else None
+    _path_cache[key] = val
+    return val
 
 
 def claude_sessions() -> List[Tuple[str, str, str]]:
