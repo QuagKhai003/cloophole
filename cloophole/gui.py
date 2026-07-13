@@ -145,6 +145,19 @@ def run() -> None:
 
     threading.Thread(target=_watch_loop, daemon=True).start()
 
+    # Register the hook + statusLine inside the WSL distro. Each call spawns wsl.exe
+    # (and starts the distro if it's cold), so do it HERE in the background — doing it
+    # in `cloophole open` delayed the window by seconds.
+    def _install_wsl_bits():
+        try:
+            from . import claude_hook as _ch, statusline as _sl
+            _ch.install_hook_wsl()
+            _sl.install_statusline_wsl()
+        except Exception:
+            pass
+
+    threading.Thread(target=_install_wsl_bits, daemon=True).start()
+
     PAD = 16  # one consistent horizontal margin for everything
 
     # ---------- header ----------
