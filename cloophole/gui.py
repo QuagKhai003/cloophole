@@ -561,6 +561,10 @@ def run() -> None:
             line1 = "Watching (this window)"
             if show_window and win_dt:
                 line1 = f"5h quota resets {win_dt.astimezone().strftime('%I:%M %p').lstrip('0')}"
+            elif st.phase == state.WATCHING and win_dt:
+                # The stored 5h window already ended; Claude only reports the next one on
+                # its next turn — say so instead of showing a blank countdown.
+                line1 = "5h window ended — send a Claude message to see the next one"
             meta = (f"{line1}   ·   Claude open now: {'yes' if _detected['live'] else 'no'}\n"
                     f"Resume in: {where}")
             if st.last_error:

@@ -107,12 +107,21 @@ def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
     return [None]
 
 
+_no_targets_warned = False   # so an un-ticked reset doesn't spam the log every tick
+
+
 def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
+    global _no_targets_warned
     dirs = _fire_dirs(st, cwds)
-    if not dirs:  # user un-ticked every detected session -> nothing to resume
-        log("no selected sessions to fire (all un-ticked); staying put")
-        state.save_runtime(st)
+    if not dirs:
+        # Nothing ticked. Stay armed (tick a session and the next tick fires) but do NOT
+        # log or write state every tick — that spammed cloophole.log and rewrote state
+        # every 5s forever.
+        if not _no_targets_warned:
+            log("nothing ticked to resume — staying armed; tick a session and it fires")
+            _no_targets_warned = True
         return
+    _no_targets_warned = False
     st.phase = state.FIRING
     state.save_runtime(st)
     log(f"FIRING in {len(dirs)} dir(s): {dirs} note={st.queue_note!r}")
