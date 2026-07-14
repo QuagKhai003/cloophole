@@ -107,6 +107,31 @@ def _fire_dirs(st: state.State, cwds: list[str]) -> list[str | None]:
     return [None]
 
 
+def _iso(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _track_window(st: state.State, now: datetime) -> bool:
+    """Remember the upcoming 5h quota-window reset that the statusLine reports, so we
+    still know it after the window passes (the statusLine only reports the NEXT one on
+    Claude's next turn). Returns True if we recorded a new window."""
+    try:
+        from . import statusline
+        info = statusline.read_status() or {}
+    except Exception:
+        return False
+    w = _iso(info.get("window_reset_at"))
+    if w and w > now and st.window_at != w.isoformat():
+        st.window_at = w.isoformat()
+        return True
+    return False
+
+
 _no_targets_warned = False   # so an un-ticked reset doesn't spam the log every tick
 
 
@@ -248,6 +273,26 @@ def tick(cfg: dict) -> state.State:
                 f"rechecks={st.recheck_at}")
             state.save_runtime(st)
             return st
+
+    # WATCHING: the 5-HOUR QUOTA WINDOW rolling over is NOT a limit hit (nothing was
+    # blocked), so we only resume then if the user actually QUEUED a message. Track the
+    # upcoming window from the statusLine and fire once when it passes.
+    if st.phase == state.WATCHING and cfg.get("fire_on_window_reset", True):
+        changed = _track_window(st, now)
+        wa = _iso(st.window_at)
+        if wa and now >= wa and st.window_at != st.fired_window_at:
+            st.fired_window_at = st.window_at          # never fire the same window twice
+            queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
+            if queued and live:
+                state.save_runtime(st)
+                log(f"5h window reset ({st.window_at}) + a queued message -> resuming")
+                _do_fire(st, cfg, cwds)
+                return state.load()
+            if queued and not live:
+                log("5h window reset, message queued, but no live session yet")
+            changed = True
+        if changed:
+            state.save_runtime(st)
 
     # WATCHING: the idle poll AND the 1h refetch loop both probe to catch the limit
     # on our own (a backup to the hook). Either being due triggers one probe.
