@@ -143,13 +143,13 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         # log or write state every tick — that spammed cloophole.log and rewrote state
         # every 5s forever.
         if not _no_targets_warned:
-            log("nothing ticked to resume — staying armed; tick a session and it fires")
+            log("nothing ticked to resume - staying armed; tick a session and it fires")
             _no_targets_warned = True
         return
     _no_targets_warned = False
     st.phase = state.FIRING
     state.save_runtime(st)
-    log(f"FIRING in {len(dirs)} dir(s): {dirs} note={st.queue_note!r}")
+    log(f"FIRING in {len(dirs)} dir(s): {dirs}")
 
     last_error = None
     relimit_text = None
@@ -160,13 +160,17 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         # re-check probes already confirmed the reset, so we don't need headless
         # still_limited detection here.
         for d in dirs:
-            err = fire.resume(d, state.note_for(st, d), cfg)
+            # log the note ACTUALLY sent to this session (per-session note wins over the
+            # bulk one) — logging st.queue_note printed None for per-session messages and
+            # made a working fire look like a lost message.
+            note = state.note_for(st, d)
+            err = fire.resume(d, note, cfg)
             if err:
                 last_error = err
                 log(f"  ERROR in {d or '(cwd)'}: {err}")
             else:
                 fired_ok = True
-                log(f"  resumed ({mode}) {d or '(cwd)'}")
+                log(f"  resumed ({mode}) {d or '(cwd)'} note={note!r}")
     else:
         for d in dirs:
             res = fire.fire(d, state.note_for(st, d), cfg)
@@ -199,7 +203,7 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.manual_reset = False
         st.recheck_at = []
         state.clear_notes()   # one-shot: retype a message for the next limit
-        log("messages cleared (one-shot) — type a new one for the next limit")
+        log("messages cleared (one-shot) - type a new one for the next limit")
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
