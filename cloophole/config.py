@@ -36,6 +36,10 @@ DEFAULTS: dict[str, Any] = {
                                     # show the worst-case +window estimate until a recheck.
     "recheck_after_min": 10,        # confirm the limit ~10 min after it's first detected
     "recheck_before_min": 10,       # confirm again ~10 min before the estimated reset
+    "fire_on_window_reset": True,   # Also resume when the 5-HOUR QUOTA WINDOW rolls over
+                                    # (not just after an actual limit hit) — but ONLY if you
+                                    # queued a message. No message = nothing fires, so this
+                                    # can't barge into a session you're working in.
     "auto_refetch": False,          # OFF: the statusLine feeds the reset time continuously
                                     # (every turn, zero quota) and the hook catches the limit
                                     # instantly, so the `claude -p` probe loop is redundant
