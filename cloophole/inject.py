@@ -18,7 +18,12 @@ from __future__ import annotations
 
 import ctypes
 import sys
+import time
 from ctypes import wintypes
+
+# Claude's TUI commits typed input asynchronously — Enter must arrive AFTER the text has
+# been committed, or it's swallowed and the message sits unsent in the box.
+SUBMIT_DELAY = 0.25
 
 if sys.platform == "win32":
     _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -122,17 +127,30 @@ def _write_console_input(pid: int, text: str, submit: bool) -> tuple[bool, str]:
                                   OPEN_EXISTING, 0, None)
         if not handle or handle == INVALID_HANDLE_VALUE:
             return False, f"CONIN$ err={ctypes.get_last_error()}"
-        seq = text + ("\r" if submit else "")
-        recs = []
-        for ch in seq:
-            recs.append(_rec(ch, True))
-            recs.append(_rec(ch, False))
-        arr = (_INPUT_RECORD * len(recs))(*recs)
-        written = wintypes.DWORD(0)
-        ok = _k32.WriteConsoleInputW(handle, arr, len(recs), ctypes.byref(written))
+        def _write(seq: str) -> tuple[bool, int]:
+            recs = []
+            for ch in seq:
+                recs.append(_rec(ch, True))
+                recs.append(_rec(ch, False))
+            arr = (_INPUT_RECORD * len(recs))(*recs)
+            written = wintypes.DWORD(0)
+            ok_ = _k32.WriteConsoleInputW(handle, arr, len(recs), ctypes.byref(written))
+            return bool(ok_), written.value
+
+        ok, n = _write(text)
         if not ok:
             return False, f"WriteConsoleInput err={ctypes.get_last_error()}"
-        return True, f"wrote {written.value} records"
+        if submit:
+            # Claude's TUI commits typed input ASYNCHRONOUSLY. Sending Enter in the same
+            # batch lands before the text is committed and gets swallowed (the message
+            # appears in the box but is never submitted). Send it separately, after a
+            # beat — the same reason tmux needs its Enter as a second send-keys.
+            time.sleep(SUBMIT_DELAY)
+            ok2, n2 = _write("\r")
+            if not ok2:
+                return False, f"WriteConsoleInput(enter) err={ctypes.get_last_error()}"
+            n += n2
+        return True, f"wrote {n} records"
     finally:
         if handle and handle != INVALID_HANDLE_VALUE:
             _k32.CloseHandle(handle)
@@ -287,8 +305,8 @@ def _paste_into(pid: int, text: str, submit: bool) -> tuple[bool, str]:
     _u32.SetForegroundWindow(hwnd)
     time.sleep(0.15)
     _send_keys([_ki(VK_CONTROL), _ki(VK_V), _ki(VK_V, True), _ki(VK_CONTROL, True)])
-    time.sleep(0.08)
     if submit:
+        time.sleep(SUBMIT_DELAY)   # let the TUI commit the pasted text before Enter
         _send_keys([_ki(VK_RETURN), _ki(VK_RETURN, True)])
     return True, f"pasted to hwnd={hwnd}"
 
