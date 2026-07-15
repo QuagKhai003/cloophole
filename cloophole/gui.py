@@ -534,9 +534,11 @@ def run() -> None:
             week_dt = _iso_dt(info.get("week_reset_at")) if info else None
             usage = (f"{info['used_pct']:.0f}% of 5h used"
                      if info and "used_pct" in info else None)
-            # The reset that unblocks you: 5h window while it's ahead, else the weekly
-            # reset (the 5h window is used up -> what used to blank out).
-            on_5h = win_dt is not None and win_dt > _now
+            # The reset that unblocks you: the 5h window while it's ahead or only just
+            # rolled over (a live user refreshes it within minutes); only when it's stale
+            # by a real margin (weekly-blocked) do we fall back to the weekly reset.
+            from datetime import timedelta as _td
+            on_5h = win_dt is not None and win_dt > _now - _td(minutes=15)
             eff_dt = win_dt if on_5h else (week_dt if (week_dt and week_dt > _now) else None)
             weekly = eff_dt is not None and not on_5h
 

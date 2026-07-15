@@ -116,12 +116,17 @@ def _iso(s):
         return None
 
 
+_STALE_GRACE_MIN = 15   # a normal 5h rollover looks 'past' only until your next Claude
+                        # turn refreshes it; beyond this it means you're weekly-blocked
+
+
 def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
-    """The next reset that unblocks you: the 5h window while it's still ahead, else the
-    WEEKLY reset. When you're weekly-blocked you can't start a new 5h window, so its
-    reset slides into the past (the watcher goes blank) — fall back to week_reset_at."""
+    """The next reset that unblocks you: the 5h window while it's ahead OR only just
+    passed (a normal rollover we still fire on). Only if it's stale by more than the
+    grace — i.e. no new 5h window can start because you're WEEKLY-blocked — do we fall
+    back to week_reset_at."""
     win = _iso(info.get("window_reset_at"))
-    if win and win > now:
+    if win and win > now - timedelta(minutes=_STALE_GRACE_MIN):
         return win
     wk = _iso(info.get("week_reset_at"))
     if wk and wk > now:
@@ -295,20 +300,23 @@ def tick(cfg: dict) -> state.State:
     # blocked), so we only resume then if the user actually QUEUED a message. Track the
     # upcoming window from the statusLine and fire once when it passes.
     if st.phase == state.WATCHING and cfg.get("fire_on_window_reset", True):
-        changed = _track_window(st, now)
+        # Check the reset we're ALREADY tracking FIRST, then record the next one — else
+        # _track_window would overwrite a just-passed 5h reset with the weekly fallback
+        # before it ever fired (which skipped the fire and jumped the countdown to 162h).
         wa = _iso(st.window_at)
+        changed = False
         if wa and now >= wa and st.window_at != st.fired_window_at:
             st.fired_window_at = st.window_at          # never fire the same window twice
             queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
             if queued and live:
                 state.save_runtime(st)
-                log(f"5h window reset ({st.window_at}) + a queued message -> resuming")
+                log(f"window reset ({st.window_at}) + a queued message -> resuming")
                 _do_fire(st, cfg, cwds)
                 return state.load()
             if queued and not live:
-                log("5h window reset, message queued, but no live session yet")
+                log("window reset, message queued, but no live session yet")
             changed = True
-        if changed:
+        if _track_window(st, now) or changed:
             state.save_runtime(st)
 
     # WATCHING: the idle poll AND the 1h refetch loop both probe to catch the limit
