@@ -1,65 +1,59 @@
 # cloophole
 
-**Auto-resume your Claude Code work when your usage limit resets.** Windows.
+**Your Claude Code kept working. Even while you sleep.**
 
-You hit the limit and walk away. cloophole watches for the reset on its own, and
-the moment it clears it types your message straight into your open `claude`
-session so the work picks itself back up. No babysitting, no lost momentum.
+You know the wall: you're deep in the work, Claude says *"you've hit your usage
+limit, try again in 5 hours"* — and everything stops. You have to remember to come
+back later, reopen everything, and re-explain what you wanted.
 
-Especially useful when you only just got 20$ subscription from Anthropic
+cloophole does that for you. You leave a note like *"keep building the checkout
+page"*, close your laptop, and walk away. The moment your limit resets, cloophole
+types your note into Claude and hits **Enter** — so the work picks itself right back
+up. You come back to progress, not a blinking cursor.
 
-- 🪟 **Just a window.** One small desktop app — it *is* the watcher. No background
-  daemon, no tray, no service.
-- 🎯 **Per-session control.** Lists every live Claude session with a tick box and
-  its own message. Resume all, or pick which ones.
-- 🧠 **Zero-quota detection + live usage.** Notices the limit via a Claude hook, and
-  reads Claude's statusLine to show your **real 5-hour reset countdown + usage %**
-  *before* you hit the wall — no quota spent.
-- 🐧 **WSL + tmux aware.** Drives Claude in plain WSL *and* individual tmux panes
-  (per-pane `send-keys`), not just native Windows terminals.
-- 🖱️ **Click to find.** Click any session to bring its terminal to the front
-  (tmux panes flash so you see which split is which).
+> Set it and forget it. Best friend of the $20 plan.
 
 ---
 
-## Install
+## Why you'll like it
 
-PowerShell — no admin, no Python:
+- 🌙 **Walk away, come back to progress.** It waits for the reset and restarts your
+  work automatically — no alarms, no babysitting.
+- ⏱️ **See your limit before you hit it.** A live *"3h 12m until reset · 38% used"*
+  readout, so no surprises mid-flow. Costs you nothing.
+- 🎯 **You're in control.** It lists every Claude you have open with a checkbox and a
+  message box. Tick the ones to continue, leave a note for each, done.
+- 🐧 **Works with your setup.** Plain terminals, WSL, tmux splits, even the Claude
+  desktop app.
+- 🪟 **Just one small window.** No account, no background service, nothing hidden.
+  Close it and it's gone.
+
+---
+
+## Get it (Windows, 30 seconds)
+
+Open PowerShell and paste one line:
 
 ```powershell
 irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/install.ps1 | iex
 ```
 
-That's the **only command you ever run** — the same line **installs, updates, and
-launches**. It stops any old copy, fetches the latest build, and opens the window.
+That's the **only** command you ever need — it installs, updates, *and* opens the
+app. (First time: restart Claude once so it can tell cloophole when you're limited.)
 
-> First time only: restart Claude Code once so it loads the zero-quota limit hook.
+## Use it (three steps)
 
-## Using it
+1. **Leave a note** — what Claude should do next (or leave it blank for "carry on").
+2. **Tick the sessions** you want continued.
+3. **Walk away.** When your limit resets, cloophole types the note in and presses
+   Enter for you.
 
-The window shows live status and your detected Claude sessions:
+Want it now instead of at reset? Hit **Resume now**. Keep the window open (minimized
+is fine) so it can watch.
 
-1. **Type a message** — what Claude should do when it resumes (blank = "pick up
-   where you left off"). Toggle **one message for all** ↔ **per-session messages**.
-2. **Tick the sessions** to resume (all ticked by default; untick to skip).
-3. Walk away. When your limit resets, cloophole types the message into each ticked
-   session automatically.
+## Remove it
 
-Buttons: **Resume now** (do it immediately) · **Reset the detected time limit**
-(if it wrongly thinks you're limited) · **Close**.
-
-Keep the window open (minimized is fine) for it to keep watching.
-
-**Sessions list:** each row shows the folder + a unique tag — `pid 1234` for
-Windows / plain WSL, `w0.p2` for tmux panes. Click a row to surface its terminal.
-
-CLI equivalents exist too: `cloophole sessions`, `cloophole status`,
-`cloophole open`, `cloophole close`.
-
-## Uninstall
-
-One line — removes everything (the exe, PATH entry, the Claude hook, app data, and
-any leftover processes):
+One line, takes everything with it:
 
 ```powershell
 irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 | iex
@@ -67,6 +61,5 @@ irm https://raw.githubusercontent.com/QuagKhai003/cloophole/main/uninstall.ps1 |
 
 ---
 
-cloophole only acts through the public `claude` CLI and OS process inspection — it
-never reads Claude Code's internal files. What to resume comes from *your* message,
-not from Claude's memory.
+**On trust:** cloophole never reads your chats or Claude's files. It only watches
+whether Claude is running and types the note *you* wrote. Nothing more.
