@@ -529,19 +529,25 @@ def run() -> None:
             st = state.load()
             from . import statusline as _sl
             info = _sl.read_status()
+            _now = datetime.now(timezone.utc)
             win_dt = _iso_dt(info.get("window_reset_at")) if info else None
+            week_dt = _iso_dt(info.get("week_reset_at")) if info else None
             usage = (f"{info['used_pct']:.0f}% of 5h used"
                      if info and "used_pct" in info else None)
+            # The reset that unblocks you: 5h window while it's ahead, else the weekly
+            # reset (the 5h window is used up -> what used to blank out).
+            on_5h = win_dt is not None and win_dt > _now
+            eff_dt = win_dt if on_5h else (week_dt if (week_dt and week_dt > _now) else None)
+            weekly = eff_dt is not None and not on_5h
 
             status_txt = _PHASE_PLAIN.get(st.phase, st.phase)
             if st.phase == state.WAITING and getattr(st, "manual_reset", False):
                 status_txt = "Counting down to your reset"
-            # Live 5h countdown from Claude's statusLine (before any limit), unless we're
-            # already counting down to an actual limit reset.
-            show_window = (st.phase == state.WATCHING and win_dt
-                           and win_dt > datetime.now(timezone.utc))
-            if show_window and usage:
+            show_window = st.phase == state.WATCHING and eff_dt is not None
+            if show_window and usage and not weekly:
                 status_txt = f"Watching · {usage}"
+            elif show_window and weekly:
+                status_txt = "Weekly limit reached"
             v_status.config(text=status_txt)
             v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
 
@@ -549,7 +555,7 @@ def run() -> None:
             if st.reset_at:
                 count_text = _countdown(st)            # actual/typed reset
             elif show_window:
-                count_text = _fmt_until(win_dt)         # live 5h window reset
+                count_text = _fmt_until(eff_dt)         # 5h window, or weekly fallback
             if count_text is not None:
                 v_count.config(text=count_text)
                 if not v_count.winfo_ismapped():
@@ -559,11 +565,11 @@ def run() -> None:
 
             where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
             line1 = "Watching (this window)"
-            if show_window and win_dt:
-                line1 = f"5h quota resets {win_dt.astimezone().strftime('%I:%M %p').lstrip('0')}"
+            if show_window and weekly:
+                line1 = f"Weekly limit resets {eff_dt.astimezone().strftime('%b %d, %I:%M %p').replace(' 0', ' ')}"
+            elif show_window:
+                line1 = f"5h quota resets {eff_dt.astimezone().strftime('%I:%M %p').lstrip('0')}"
             elif st.phase == state.WATCHING and win_dt:
-                # The stored 5h window already ended; Claude only reports the next one on
-                # its next turn — say so instead of showing a blank countdown.
                 line1 = "5h window ended — send a Claude message to see the next one"
             meta = (f"{line1}   ·   Claude open now: {'yes' if _detected['live'] else 'no'}\n"
                     f"Resume in: {where}")
