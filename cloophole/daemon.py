@@ -116,17 +116,30 @@ def _iso(s):
         return None
 
 
+def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
+    """The next reset that unblocks you: the 5h window while it's still ahead, else the
+    WEEKLY reset. When you're weekly-blocked you can't start a new 5h window, so its
+    reset slides into the past (the watcher goes blank) — fall back to week_reset_at."""
+    win = _iso(info.get("window_reset_at"))
+    if win and win > now:
+        return win
+    wk = _iso(info.get("week_reset_at"))
+    if wk and wk > now:
+        return wk
+    return None
+
+
 def _track_window(st: state.State, now: datetime) -> bool:
-    """Remember the upcoming 5h quota-window reset that the statusLine reports, so we
-    still know it after the window passes (the statusLine only reports the NEXT one on
-    Claude's next turn). Returns True if we recorded a new window."""
+    """Remember the upcoming reset that unblocks you (5h window, or the weekly reset once
+    the 5h window is used up) — the statusLine only reports it on Claude's next turn, so
+    we must hold it. Returns True if we recorded a new one."""
     try:
         from . import statusline
         info = statusline.read_status() or {}
     except Exception:
         return False
-    w = _iso(info.get("window_reset_at"))
-    if w and w > now and st.window_at != w.isoformat():
+    w = _effective_reset(info, now)
+    if w and st.window_at != w.isoformat():
         st.window_at = w.isoformat()
         return True
     return False
