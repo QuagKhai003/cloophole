@@ -135,16 +135,19 @@ def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
 
 
 def _track_window(st: state.State, now: datetime) -> bool:
-    """Remember the upcoming reset that unblocks you (5h window, or the weekly reset once
-    the 5h window is used up) — the statusLine only reports it on Claude's next turn, so
-    we must hold it. Returns True if we recorded a new one."""
+    """SEED the next reset target from the statusLine only when we don't already have a
+    fresh future one — never overwrite the +5h target set after a fire (else a stale
+    statusLine drags it back and it double-/mis-fires). Returns True if we set one."""
+    cur = _iso(st.window_at)
+    if cur and cur > now and st.window_at != st.fired_window_at:
+        return False   # already have a fresh future target -> keep it
     try:
         from . import statusline
         info = statusline.read_status() or {}
     except Exception:
         return False
     w = _effective_reset(info, now)
-    if w and st.window_at != w.isoformat():
+    if w and w.isoformat() != st.fired_window_at and st.window_at != w.isoformat():
         st.window_at = w.isoformat()
         return True
     return False
@@ -219,6 +222,10 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         return
 
     if fired_ok:
+        # Mark the reset we just fired for (from either path — the hook's reset_at or the
+        # window's window_at) so the OTHER path can't double-fire it, and aim window_at at
+        # the next ~5h window so it keeps firing every reset even if the statusLine idles.
+        fired_at = st.reset_at or st.window_at
         st.last_fired = datetime.now(timezone.utc).isoformat()
         st.last_error = None
         st.reset_at = None
@@ -226,9 +233,15 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.hook_dir = None
         st.manual_reset = False
         st.recheck_at = []
-        # PERSISTENT message: keep it so the SAME note fires at every reset (the
-        # fired_window_at guard stops it repeating within one window). Edit/clear the
-        # box to change or stop it.
+        if fired_at:
+            st.fired_window_at = fired_at
+            dt = _iso(fired_at)
+            if dt:
+                st.window_at = (dt + timedelta(
+                    hours=cfg.get("limit_window_hours", 5))).isoformat()
+        log(f"fired -> next window ~{st.window_at}")
+        # PERSISTENT message: kept so the SAME note fires at every reset until you change
+        # the box (fired_window_at stops it repeating within one window).
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
@@ -313,13 +326,17 @@ def tick(cfg: dict) -> state.State:
         wa = _iso(st.window_at)
         changed = False
         if wa and now >= wa and st.window_at != st.fired_window_at:
-            st.fired_window_at = st.window_at          # never fire the same window twice
             queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
             if queued and live:
                 state.save_runtime(st)
-                log(f"window reset ({st.window_at}) + a queued message -> resuming")
-                _do_fire(st, cfg, cwds)
+                log(f"window reset ({st.window_at}) + a message -> resuming")
+                _do_fire(st, cfg, cwds)   # marks fired_window_at + aims window_at +5h
                 return state.load()
+            # no message or no live session: mark this reset fired + aim at the next
+            # window so we don't retrigger every tick (and never fire a blank).
+            st.fired_window_at = st.window_at
+            st.window_at = (wa + timedelta(
+                hours=cfg.get("limit_window_hours", 5))).isoformat()
             if queued and not live:
                 log("window reset, message queued, but no live session yet")
             changed = True
