@@ -135,20 +135,16 @@ def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
 
 
 def _track_window(st: state.State, now: datetime) -> bool:
-    """SEED the next reset target from the statusLine when we don't already have a future
-    one. We only seed (window_at is None or already passed) — we never overwrite a future
-    target, so the +5h extrapolation set after each fire (which keeps it firing even when
-    the statusLine goes idle) is preserved. Returns True if we set a new target."""
-    cur = _iso(st.window_at)
-    if cur and cur > now and st.window_at != st.fired_window_at:
-        return False   # already have a fresh future target -> keep it
+    """Remember the upcoming reset that unblocks you (5h window, or the weekly reset once
+    the 5h window is used up) — the statusLine only reports it on Claude's next turn, so
+    we must hold it. Returns True if we recorded a new one."""
     try:
         from . import statusline
         info = statusline.read_status() or {}
     except Exception:
         return False
     w = _effective_reset(info, now)
-    if w and w.isoformat() != st.fired_window_at and st.window_at != w.isoformat():
+    if w and st.window_at != w.isoformat():
         st.window_at = w.isoformat()
         return True
     return False
@@ -318,15 +314,10 @@ def tick(cfg: dict) -> state.State:
         changed = False
         if wa and now >= wa and st.window_at != st.fired_window_at:
             st.fired_window_at = st.window_at          # never fire the same window twice
-            # Aim at the NEXT ~5h window right away so we keep firing every reset even if
-            # the session goes idle and the statusLine stops updating (a fresh statusLine
-            # re-seeds an accurate time later via _track_window).
-            st.window_at = (wa + timedelta(hours=cfg.get("limit_window_hours", 5))).isoformat()
             queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
             if queued and live:
                 state.save_runtime(st)
-                log(f"window reset ({st.fired_window_at}) + a message -> resuming; "
-                    f"next ~{st.window_at}")
+                log(f"window reset ({st.window_at}) + a queued message -> resuming")
                 _do_fire(st, cfg, cwds)
                 return state.load()
             if queued and not live:
