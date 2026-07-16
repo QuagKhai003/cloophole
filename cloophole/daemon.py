@@ -178,10 +178,12 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         # re-check probes already confirmed the reset, so we don't need headless
         # still_limited detection here.
         for d in dirs:
-            # log the note ACTUALLY sent to this session (per-session note wins over the
-            # bulk one) — logging st.queue_note printed None for per-session messages and
-            # made a working fire look like a lost message.
             note = state.note_for(st, d)
+            if not (note and note.strip()):
+                # Auto-fire ONLY when a message is typed for this session — no blank
+                # fallback, so a ticked-but-empty session is never resumed on its own.
+                log(f"  skip {d or '(cwd)'}: no message typed")
+                continue
             err = fire.resume(d, note, cfg)
             if err:
                 last_error = err
@@ -191,7 +193,11 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
                 log(f"  resumed ({mode}) {d or '(cwd)'} note={note!r}")
     else:
         for d in dirs:
-            res = fire.fire(d, state.note_for(st, d), cfg)
+            note = state.note_for(st, d)
+            if not (note and note.strip()):
+                log(f"  skip {d or '(cwd)'}: no message typed")
+                continue
+            res = fire.fire(d, note, cfg)
             if res.error:
                 last_error = res.error
                 log(f"  ERROR in {d or '(cwd)'}: {res.error}")
@@ -220,8 +226,9 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.hook_dir = None
         st.manual_reset = False
         st.recheck_at = []
-        state.clear_notes()   # one-shot: retype a message for the next limit
-        log("messages cleared (one-shot) - type a new one for the next limit")
+        # PERSISTENT message: keep it so the SAME note fires at every reset (the
+        # fired_window_at guard stops it repeating within one window). Edit/clear the
+        # box to change or stop it.
     else:
         st.last_error = last_error
     st.phase = state.WATCHING
