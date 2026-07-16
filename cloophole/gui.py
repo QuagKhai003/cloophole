@@ -218,8 +218,10 @@ def run() -> None:
         v_notehdr.config(text="DEFAULT MESSAGE (per-session below overrides)" if per
                          else "MESSAGE TO SEND ON RESUME")
         mode_btn.config(text="↔ one message for all" if per else "↔ per-session messages")
-        note_hint.config(text="each ticked session gets its own box below; blank = use default"
-                         if per else "blank = pick up where you left off")
+        note_hint.config(
+            text=("each ticked session gets its own box; blank = use the default above; "
+                  "no message at all = that session won't auto-fire" if per else
+                  "your message fires at every reset until you change it; blank = no auto-fire"))
         _render_sessions(force=True)
 
     def _toggle_note_mode(*_):
@@ -466,14 +468,8 @@ def run() -> None:
             else:
                 done += 1
         if done:
-            # One-shot message: erase it so the next limit needs a freshly typed one.
-            state.clear_notes()
-            note_var.set("")
-            _render_sessions(force=True)
-            messagebox.showinfo(
-                "cloophole",
-                f"Resumed {done} session(s).\nMessages cleared — type a new one "
-                "for the next limit.")
+            # Persistent: the message stays and fires at every reset until you change it.
+            messagebox.showinfo("cloophole", f"Resumed {done} session(s).")
         else:
             messagebox.showwarning(
                 "cloophole", f"Couldn't resume: {errs[0] if errs else 'unknown'}")
