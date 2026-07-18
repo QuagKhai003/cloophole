@@ -526,26 +526,28 @@ def run() -> None:
             from . import statusline as _sl
             info = _sl.read_status()
             _now = datetime.now(timezone.utc)
-            win_dt = _iso_dt(info.get("window_reset_at")) if info else None
             week_dt = _iso_dt(info.get("week_reset_at")) if info else None
             usage = (f"{info['used_pct']:.0f}% of 5h used"
                      if info and "used_pct" in info else None)
-            # The reset that unblocks you: the 5h window while it's ahead or only just
-            # rolled over (a live user refreshes it within minutes); only when it's stale
-            # by a real margin (weekly-blocked) do we fall back to the weekly reset.
-            from datetime import timedelta as _td
-            on_5h = win_dt is not None and win_dt > _now - _td(minutes=15)
-            eff_dt = win_dt if on_5h else (week_dt if (week_dt and week_dt > _now) else None)
-            weekly = eff_dt is not None and not on_5h
+            # Show the DAEMON's tracked next reset (window_at) — it's extrapolated +5h
+            # after each fire and seeded from the statusLine, so it never goes blank/stale
+            # like the raw statusLine does once a session idles. Falls back to the raw
+            # statusLine only before the daemon has recorded a target.
+            target = _iso_dt(getattr(st, "window_at", None))
+            if target is None and info:
+                target = _iso_dt(info.get("window_reset_at"))
+            # It's the WEEKLY reset only if the daemon genuinely fell back to it.
+            weekly = (target is not None and week_dt is not None
+                      and abs((target - week_dt).total_seconds()) < 120)
 
             status_txt = _PHASE_PLAIN.get(st.phase, st.phase)
             if st.phase == state.WAITING and getattr(st, "manual_reset", False):
                 status_txt = "Counting down to your reset"
-            show_window = st.phase == state.WATCHING and eff_dt is not None
-            if show_window and usage and not weekly:
-                status_txt = f"Watching · {usage}"
-            elif show_window and weekly:
+            show_window = st.phase == state.WATCHING and target is not None
+            if show_window and weekly:
                 status_txt = "Weekly limit reached"
+            elif show_window and usage:
+                status_txt = f"Watching · {usage}"
             v_status.config(text=status_txt)
             v_dot.config(fg=_PHASE_COLOR.get(st.phase, SUB))
 
@@ -553,7 +555,7 @@ def run() -> None:
             if st.reset_at:
                 count_text = _countdown(st)            # actual/typed reset
             elif show_window:
-                count_text = _fmt_until(eff_dt)         # 5h window, or weekly fallback
+                count_text = _fmt_until(target)         # daemon's next reset target
             if count_text is not None:
                 v_count.config(text=count_text)
                 if not v_count.winfo_ismapped():
@@ -564,11 +566,9 @@ def run() -> None:
             where = (f"pinned → {st.work_dir}" if st.work_dir else "the ticked sessions")
             line1 = "Watching (this window)"
             if show_window and weekly:
-                line1 = f"Weekly limit resets {eff_dt.astimezone().strftime('%b %d, %I:%M %p').replace(' 0', ' ')}"
+                line1 = f"Weekly limit resets {target.astimezone().strftime('%b %d, %I:%M %p').replace(' 0', ' ')}"
             elif show_window:
-                line1 = f"5h quota resets {eff_dt.astimezone().strftime('%I:%M %p').lstrip('0')}"
-            elif st.phase == state.WATCHING and win_dt:
-                line1 = "5h window ended — send a Claude message to see the next one"
+                line1 = f"Next resume ~{target.astimezone().strftime('%I:%M %p').lstrip('0')}"
             meta = (f"{line1}   ·   Claude open now: {'yes' if _detected['live'] else 'no'}\n"
                     f"Resume in: {where}")
             if st.last_error:
