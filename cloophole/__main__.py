@@ -202,8 +202,12 @@ def cmd_clear(_args: list[str]) -> int:
     st.reset_at = None
     st.limit_text = None
     st.last_error = None
+    # drop the 5h cadence anchor too, so it re-seeds a fresh window +5h from now
+    # (recovers a drifted/wrong window_at without reinstalling).
+    st.window_at = None
+    st.fired_window_at = None
     state.save_runtime(st)
-    print("cleared -> WATCHING")
+    print("cleared -> WATCHING (5h cadence restarts +5h from now)")
     return 0
 
 

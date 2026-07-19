@@ -134,23 +134,21 @@ def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
     return None
 
 
-def _track_window(st: state.State, now: datetime) -> bool:
-    """SEED the next reset target from the statusLine only when we don't already have a
-    fresh future one — never overwrite the +5h target set after a fire (else a stale
-    statusLine drags it back and it double-/mis-fires). Returns True if we set one."""
+def _track_window(st: state.State, now: datetime, cfg: dict) -> bool:
+    """SEED the 5h cadence when we don't already have a fresh future target. We
+    SELF-COUNT: the next window is `now + limit_window_hours`, computed off our own
+    clock — NOT read from the statusLine, which proved unreliable (its window_reset_at
+    can be plain wrong). The app owns its own timer so it keeps firing every 5h even
+    while you're away. Returns True if we (re)seeded the target."""
     cur = _iso(st.window_at)
     if cur and cur > now and st.window_at != st.fired_window_at:
         return False   # already have a fresh future target -> keep it
-    try:
-        from . import statusline
-        info = statusline.read_status() or {}
-    except Exception:
-        return False
-    w = _effective_reset(info, now)
-    if w and w.isoformat() != st.fired_window_at and st.window_at != w.isoformat():
-        st.window_at = w.isoformat()
-        return True
-    return False
+    queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
+    if not queued:
+        return False   # nothing to resume -> don't arm a timer (and don't write state)
+    period = timedelta(hours=cfg.get("limit_window_hours", 5))
+    st.window_at = (now + period).isoformat()
+    return True
 
 
 _no_targets_warned = False   # so an un-ticked reset doesn't spam the log every tick
@@ -226,7 +224,8 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         # window's window_at) so the OTHER path can't double-fire it, and aim window_at at
         # the next ~5h window so it keeps firing every reset even if the statusLine idles.
         fired_at = st.reset_at or st.window_at
-        st.last_fired = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        st.last_fired = now.isoformat()
         st.last_error = None
         st.reset_at = None
         st.limit_text = None
@@ -235,10 +234,15 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.recheck_at = []
         if fired_at:
             st.fired_window_at = fired_at
-            dt = _iso(fired_at)
-            if dt:
-                st.window_at = (dt + timedelta(
-                    hours=cfg.get("limit_window_hours", 5))).isoformat()
+            # Aim the next window a full period from the ACTUAL fire moment (now), NOT
+            # from the boundary we fired for. On catch-up (you were away, the window
+            # sat unfired for hours) `fired_at + 5h` can still be in the PAST, so the
+            # next tick fires it again -> the double-fire storm. Anchoring to now
+            # guarantees one fire + a future target, and makes the 5h cadence
+            # SELF-COUNTED off our own clock (no dependence on the statusLine, which
+            # can be wrong).
+            st.window_at = (now + timedelta(
+                hours=cfg.get("limit_window_hours", 5))).isoformat()
         log(f"fired -> next window ~{st.window_at}")
         # PERSISTENT message: kept so the SAME note fires at every reset until you change
         # the box (fired_window_at stops it repeating within one window).
@@ -317,12 +321,12 @@ def tick(cfg: dict) -> state.State:
             return st
 
     # WATCHING: the 5-HOUR QUOTA WINDOW rolling over is NOT a limit hit (nothing was
-    # blocked), so we only resume then if the user actually QUEUED a message. Track the
-    # upcoming window from the statusLine and fire once when it passes.
+    # blocked), so we only resume then if the user actually QUEUED a message. The window
+    # target is SELF-COUNTED (we own the clock; see _track_window) and fires once when it
+    # passes, then re-aims a full period from now.
     if st.phase == state.WATCHING and cfg.get("fire_on_window_reset", True):
-        # Check the reset we're ALREADY tracking FIRST, then record the next one — else
-        # _track_window would overwrite a just-passed 5h reset with the weekly fallback
-        # before it ever fired (which skipped the fire and jumped the countdown to 162h).
+        # Check the reset we're ALREADY tracking FIRST, then seed the next one — so a
+        # just-passed window isn't skipped before it fires.
         wa = _iso(st.window_at)
         changed = False
         if wa and now >= wa and st.window_at != st.fired_window_at:
@@ -330,17 +334,19 @@ def tick(cfg: dict) -> state.State:
             if queued and live:
                 state.save_runtime(st)
                 log(f"window reset ({st.window_at}) + a message -> resuming")
-                _do_fire(st, cfg, cwds)   # marks fired_window_at + aims window_at +5h
+                _do_fire(st, cfg, cwds)   # fires, then aims window_at at now + period
                 return state.load()
             # no message or no live session: mark this reset fired + aim at the next
             # window so we don't retrigger every tick (and never fire a blank).
             st.fired_window_at = st.window_at
-            st.window_at = (wa + timedelta(
+            # self-count from NOW (not the passed boundary `wa`): if you were away for
+            # hours, `wa + 5h` may still be in the past -> a fire storm on catch-up.
+            st.window_at = (now + timedelta(
                 hours=cfg.get("limit_window_hours", 5))).isoformat()
             if queued and not live:
                 log("window reset, message queued, but no live session yet")
             changed = True
-        if _track_window(st, now) or changed:
+        if _track_window(st, now, cfg) or changed:
             state.save_runtime(st)
 
     # WATCHING: the idle poll AND the 1h refetch loop both probe to catch the limit
