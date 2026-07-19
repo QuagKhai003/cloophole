@@ -134,20 +134,58 @@ def _effective_reset(info: dict, now: datetime) -> Optional[datetime]:
     return None
 
 
+def _grid_next(anchor: datetime, now: datetime, period: timedelta,
+               grace: timedelta) -> datetime:
+    """The next 5h boundary on Claude's OWN grid: the smallest `anchor + k*period`
+    that is still ahead of `now - grace`. `anchor` is a real reset time from the
+    statusLine (Claude's truth); this preserves its exact phase (e.g. :10 past) and
+    just rolls a stale/old capture forward onto the current window — so we always land
+    on Claude's real reset (5:10), never a drifted `now + 5h`."""
+    thresh = now - grace
+    if anchor > thresh:
+        return anchor
+    p = period.total_seconds()
+    k = int((thresh - anchor).total_seconds() // p) + 1
+    return anchor + timedelta(seconds=k * p)
+
+
+def _window_anchor(st: state.State) -> Optional[datetime]:
+    """Claude's real 5h reset to phase our grid on: the statusLine's window_reset_at if
+    we have it (Claude's truth), else the reset we're already tracking. The statusLine
+    value is trusted for PHASE even when stale — _grid_next rolls it to the live window."""
+    try:
+        from . import statusline
+        info = statusline.read_status() or {}
+    except Exception:
+        info = {}
+    return _iso(info.get("window_reset_at")) or _iso(st.window_at)
+
+
 def _track_window(st: state.State, now: datetime, cfg: dict) -> bool:
-    """SEED the 5h cadence when we don't already have a fresh future target. We
-    SELF-COUNT: the next window is `now + limit_window_hours`, computed off our own
-    clock — NOT read from the statusLine, which proved unreliable (its window_reset_at
-    can be plain wrong). The app owns its own timer so it keeps firing every 5h even
-    while you're away. Returns True if we (re)seeded the target."""
-    cur = _iso(st.window_at)
-    if cur and cur > now and st.window_at != st.fired_window_at:
-        return False   # already have a fresh future target -> keep it
-    queued = bool((st.queue_note or "").strip()) or bool(st.session_notes)
-    if not queued:
-        return False   # nothing to resume -> don't arm a timer (and don't write state)
+    """Keep window_at pinned to Claude's real next 5h reset (from the statusLine),
+    projected onto the 5h grid so a stale capture still resolves to the live window.
+    Returns True if we changed the target (a write is needed)."""
     period = timedelta(hours=cfg.get("limit_window_hours", 5))
-    st.window_at = (now + period).isoformat()
+    grace = timedelta(minutes=_STALE_GRACE_MIN)
+    anchor = _window_anchor(st)
+    if anchor is None:
+        # no 5h info at all: fall back to the weekly reset if we're weekly-blocked
+        try:
+            from . import statusline
+            wk = _iso((statusline.read_status() or {}).get("week_reset_at"))
+        except Exception:
+            wk = None
+        if wk and wk > now and st.window_at != wk.isoformat() \
+                and st.fired_window_at != wk.isoformat():
+            st.window_at = wk.isoformat()
+            return True
+        return False
+    target = _grid_next(anchor, now, period, grace)
+    if st.fired_window_at and target == _iso(st.fired_window_at):
+        target = target + period   # already fired this boundary -> aim at the next
+    if st.window_at == target.isoformat():
+        return False
+    st.window_at = target.isoformat()
     return True
 
 
@@ -234,15 +272,19 @@ def _do_fire(st: state.State, cfg: dict, cwds: list[str]) -> None:
         st.recheck_at = []
         if fired_at:
             st.fired_window_at = fired_at
-            # Aim the next window a full period from the ACTUAL fire moment (now), NOT
-            # from the boundary we fired for. On catch-up (you were away, the window
-            # sat unfired for hours) `fired_at + 5h` can still be in the PAST, so the
-            # next tick fires it again -> the double-fire storm. Anchoring to now
-            # guarantees one fire + a future target, and makes the 5h cadence
-            # SELF-COUNTED off our own clock (no dependence on the statusLine, which
-            # can be wrong).
-            st.window_at = (now + timedelta(
-                hours=cfg.get("limit_window_hours", 5))).isoformat()
+            # Aim the next window at Claude's real NEXT 5h reset, on its own grid:
+            # anchor on the statusLine reset (its true phase, e.g. :10 past) and roll
+            # forward to the first boundary that's still ahead. This lands on the actual
+            # reset (5:10), not a drifted `now + 5h`. Rolling to a FUTURE boundary also
+            # kills the catch-up storm: `fired_at + 5h` could sit in the past and refire
+            # every tick; a future grid boundary fires exactly once.
+            period = timedelta(hours=cfg.get("limit_window_hours", 5))
+            grace = timedelta(minutes=_STALE_GRACE_MIN)
+            anchor = _window_anchor(st) or _iso(fired_at) or now
+            target = _grid_next(anchor, now, period, grace)
+            if target == _iso(fired_at):     # never re-aim at the one we just fired
+                target = target + period
+            st.window_at = target.isoformat()
         log(f"fired -> next window ~{st.window_at}")
         # PERSISTENT message: kept so the SAME note fires at every reset until you change
         # the box (fired_window_at stops it repeating within one window).
@@ -321,12 +363,12 @@ def tick(cfg: dict) -> state.State:
             return st
 
     # WATCHING: the 5-HOUR QUOTA WINDOW rolling over is NOT a limit hit (nothing was
-    # blocked), so we only resume then if the user actually QUEUED a message. The window
-    # target is SELF-COUNTED (we own the clock; see _track_window) and fires once when it
-    # passes, then re-aims a full period from now.
+    # blocked), so we only resume then if the user actually QUEUED a message. window_at
+    # tracks Claude's real reset (statusLine, gridded — see _track_window); we fire once
+    # when it passes, then re-aim at the next real boundary.
     if st.phase == state.WATCHING and cfg.get("fire_on_window_reset", True):
-        # Check the reset we're ALREADY tracking FIRST, then seed the next one — so a
-        # just-passed window isn't skipped before it fires.
+        # Check the reset we're ALREADY tracking FIRST, then re-track — so a just-passed
+        # window isn't skipped before it fires.
         wa = _iso(st.window_at)
         changed = False
         if wa and now >= wa and st.window_at != st.fired_window_at:
@@ -336,13 +378,11 @@ def tick(cfg: dict) -> state.State:
                 log(f"window reset ({st.window_at}) + a message -> resuming")
                 _do_fire(st, cfg, cwds)   # fires, then aims window_at at now + period
                 return state.load()
-            # no message or no live session: mark this reset fired + aim at the next
-            # window so we don't retrigger every tick (and never fire a blank).
+            # no message or no live session: mark this reset fired so we don't retrigger
+            # every tick (and never fire a blank). _track_window (below) then grids the
+            # next window forward to the first boundary still ahead — skipping the one we
+            # just marked, so a long gap while you were away can't leave a past target.
             st.fired_window_at = st.window_at
-            # self-count from NOW (not the passed boundary `wa`): if you were away for
-            # hours, `wa + 5h` may still be in the past -> a fire storm on catch-up.
-            st.window_at = (now + timedelta(
-                hours=cfg.get("limit_window_hours", 5))).isoformat()
             if queued and not live:
                 log("window reset, message queued, but no live session yet")
             changed = True

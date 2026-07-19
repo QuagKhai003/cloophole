@@ -49,7 +49,7 @@ class State:
     last_poll: Optional[str] = None       # last idle probe (ISO UTC)
     hook_dir: Optional[str] = None        # cwd from the rate-limit hook (fire fallback)
     manual_reset: bool = False            # user typed the reset time -> don't probe-override it
-    window_at: Optional[str] = None       # upcoming 5h quota-window reset (SELF-COUNTED: now+5h)
+    window_at: Optional[str] = None       # upcoming 5h reset (statusLine, gridded to live window)
     fired_window_at: Optional[str] = None  # window we already fired for (never twice)
     recheck_at: list = field(default_factory=list)  # pending probe re-checks (ISO UTC)
     live_session: bool = False            # last observed
